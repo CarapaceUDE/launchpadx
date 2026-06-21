@@ -16,11 +16,16 @@ export interface LauncherConfig {
     codexConfigPath?: string;
     codexCommand?: string;
     workingDirectory?: string;
+    codexApiKeyMode?: "envKey" | "experimentalBearerToken" | "none";
 }
 
 export interface HealthState {
     running: boolean;
     apiReady: boolean;
+    endpointReady?: boolean;
+    pid?: number | null;
+    method?: string | null;
+    error?: string;
 }
 
 export interface ModelInfo {

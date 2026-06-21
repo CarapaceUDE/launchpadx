@@ -6,7 +6,7 @@ use crate::acp_client::{AcpClient, MessageResponse};
 use crate::codex_config;
 use crate::codex_process::{CodexProcess, CodexProcessInfo, ProcessState};
 use crate::config::LauncherConfig;
-use crate::launcher;
+use crate::launcher::{self, LaunchTarget};
 use crate::ollama;
 
 pub fn default_config_path(root: &Path) -> PathBuf {
@@ -81,27 +81,41 @@ pub fn launch(
     root: &Path,
     pid_file: &std::path::Path,
 ) -> Result<String, Box<dyn Error>> {
+    let existing = detect_codex_process(config, root);
+    if existing.running {
+        let method = existing.method.unwrap_or_else(|| "unknown".to_string());
+        return Err(format!("Codex is already running (detected via {method})").into());
+    }
+
     let base_url = config.openai_base_url()?;
     let api_key = config.api_key()?;
     let working_directory = config.working_directory(root)?;
     let codex_args = config.codex_args();
-    let codex_command = config
-         .codex_command()
-         .ok_or("codexCommand not set in config")?;
-
     let target = launcher::resolve(config)?;
     let launch_target = target.to_string();
 
-    CodexProcess::spawn(
-         &codex_command,
-         &working_directory,
-         &codex_args,
-         &base_url,
-         &api_key,
-        pid_file,
-     )?;
+    match &target {
+        LaunchTarget::Path(path) => {
+            let command = path
+                .to_str()
+                .ok_or_else(|| "Resolved Codex path is not valid UTF-8")?;
+            CodexProcess::spawn(
+                command,
+                &working_directory,
+                &codex_args,
+                &base_url,
+                &api_key,
+                pid_file,
+            )?;
+        }
+        LaunchTarget::WindowsStartApp { app_id } => {
+            launcher::launch_windows_start_app(app_id)?;
+        }
+        LaunchTarget::MacAppBundle(bundle) => {
+            launcher::launch_macos_bundle(bundle, &working_directory, &base_url, &api_key)?;
+        }
+    }
 
-     // Don't wait for API readiness in the basic launch - just return
     Ok(format!("Launching Codex via {launch_target}"))
 }
 
@@ -114,24 +128,36 @@ pub async fn launch_and_wait(
     let api_key = config.api_key()?;
     let working_directory = config.working_directory(root)?;
     let codex_args = config.codex_args();
-    let codex_command = config
-         .codex_command()
-         .ok_or("codexCommand not set in config")?;
-
     let target = launcher::resolve(config)?;
-    let _launch_target = target.to_string();
 
-    let mut _process = CodexProcess::spawn(
-         &codex_command,
-         &working_directory,
-         &codex_args,
-         &base_url,
-         &api_key,
-        pid_file,
-     )?;
+    let mut process = match &target {
+        LaunchTarget::Path(path) => {
+            let command = path
+                .to_str()
+                .ok_or_else(|| "Resolved Codex path is not valid UTF-8")?;
+            CodexProcess::spawn(
+                command,
+                &working_directory,
+                &codex_args,
+                &base_url,
+                &api_key,
+                pid_file,
+            )?
+        }
+        LaunchTarget::WindowsStartApp { app_id } => {
+            launcher::launch_windows_start_app(app_id)?;
+            return Err(
+                "Codex launched via Windows Start App; cannot wait for API readiness".into(),
+            );
+        }
+        LaunchTarget::MacAppBundle(bundle) => {
+            launcher::launch_macos_bundle(bundle, &working_directory, &base_url, &api_key)?;
+            return Err("Codex launched via app bundle; cannot wait for API readiness".into());
+        }
+    };
 
-     _process.wait_for_start(30)?;
-    Ok(_process)
+    process.wait_for_start(30)?;
+    Ok(process)
 }
 
 pub fn kill_codex(process: &mut CodexProcess) -> Result<String, Box<dyn Error>> {
@@ -143,9 +169,62 @@ pub fn kill_codex_by_pid(pid_file: &Path) -> Result<String, Box<dyn Error>> {
     CodexProcess::kill_by_pid_file(pid_file)
 }
 
+/// Stop Codex whether it was launched by this app or externally.
+pub fn stop_codex(
+    config: &LauncherConfig,
+    root: &Path,
+    pid_file: &Path,
+) -> Result<String, Box<dyn Error>> {
+    if pid_file.exists() {
+        if let Ok(msg) = kill_codex_by_pid(pid_file) {
+            return Ok(msg);
+        }
+    }
+
+    let exe_pid_file = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|p| p.join(".codex.pid")))
+        .filter(|path| path != pid_file);
+    if let Some(path) = exe_pid_file {
+        if path.exists() {
+            if let Ok(msg) = kill_codex_by_pid(&path) {
+                return Ok(msg);
+            }
+        }
+    }
+
+    let info = detect_codex_process(config, root);
+    if info.running {
+        if let Some(pid) = info.pid {
+            if info.restart_required {
+                return kill_codex_by_pid_number(pid);
+            }
+            return Err(
+                "Detected a running backend service, not the Codex app; refusing to stop it.".into(),
+            );
+        }
+        return Err("Codex appears to be running but no PID was found to stop.".into());
+    }
+
+    Err("Codex is not running.".into())
+}
+
 pub async fn health_check(config: &LauncherConfig) -> Result<ProcessState, Box<dyn Error>> {
     let process = CodexProcess::new(config.codex_api_base_url());
     process.health_check(1).await
+}
+
+pub fn endpoint_reachable(config: &LauncherConfig) -> bool {
+    let Ok(base_url) = config.openai_base_url() else {
+        return false;
+    };
+    let url = format!("{}/api/tags", base_url.trim_end_matches('/'));
+    endpoint_responds(&url, 2)
+}
+
+pub fn codex_api_ready(config: &LauncherConfig) -> bool {
+    let url = format!("{}/health", config.codex_api_base_url());
+    endpoint_responds(&url, 2)
 }
 
 pub async fn start_session(
@@ -214,121 +293,71 @@ pub fn disable_auto_start(config: &LauncherConfig) -> Result<String, Box<dyn std
      }
 }
 
-/// Detect if Codex is already running.
-/// Tries multiple strategies in order:
-/// 1. Check our own PID file (written when this launcher spawned it)
-/// 2. Hit the configured codex_api_port for a /health endpoint
-/// 3. Hit the configured ollamaIp:ollamaPort for a /api/tags endpoint
-/// 4. Scan common Codex/Ollama ports for /health or /api/tags responses
-/// Detect if Codex is already running by any means.
-/// Strategies in priority order:
-/// 1. Check PID file written when this launcher spawned Codex
-/// 2. Scan for running Codex process by name (works when Codex was launched externally)
-/// 3. Hit the configured codex_api_port for a /health endpoint
-/// 4. Hit the configured ollamaIp:ollamaPort for a /api/tags endpoint
-/// 5. Scan common ports for /health or /api/tags
-pub fn detect_codex_process(config: &LauncherConfig) -> CodexProcessInfo {
-         // Strategy 1: PID file from launcher spawn
-        let config_dir = std::env::current_exe()
-                 .ok()
-                 .and_then(|path| path.parent().map(|p| p.to_path_buf()))
-                 .unwrap_or_else(|| PathBuf::from("."));
-        let launcher_pid_file = config_dir.join(".codex.pid");
+/// Detect whether the Codex desktop app is running.
+/// Ollama/backend reachability is tracked separately via `endpoint_reachable`.
+pub fn detect_codex_process(config: &LauncherConfig, root: &Path) -> CodexProcessInfo {
+    let mut pid_files = vec![CodexProcess::spawn_pid_file_path(root)];
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let exe_pid = parent.join(".codex.pid");
+            if !pid_files.contains(&exe_pid) {
+                pid_files.push(exe_pid);
+            }
+        }
+    }
 
-        if launcher_pid_file.exists() {
-            if let Ok(pid_str) = fs::read_to_string(&launcher_pid_file) {
-                if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                    if is_process_running(pid) {
-                        let base_url = config.codex_api_base_url();
-                        if endpoint_responds(&base_url, 2) {
-                            return CodexProcessInfo {
-                                running: true,
-                                pid: Some(pid),
-                                method: Some("pid_file".to_string()),
-                                restart_required: true,
-                             };
-                         }
-                        let _ = fs::remove_file(&launcher_pid_file);
-                     } else {
-                        let _ = fs::remove_file(&launcher_pid_file);
-                     }
-                 }
-             }
-         }
+    for launcher_pid_file in pid_files {
+        if !launcher_pid_file.exists() {
+            continue;
+        }
+        if let Ok(pid_str) = fs::read_to_string(&launcher_pid_file) {
+            if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                if is_process_running(pid) {
+                    return CodexProcessInfo {
+                        running: true,
+                        pid: Some(pid),
+                        method: Some("pid_file".to_string()),
+                        restart_required: true,
+                    };
+                }
+                let _ = fs::remove_file(&launcher_pid_file);
+            }
+        }
+    }
 
-         // Strategy 2: detect Codex by process name (primary detection for externally-launched Codex)
-        if let Some(info) = detect_codex_by_name() {
-            return info;
-         }
+    if let Some(info) = detect_codex_by_name() {
+        return info;
+    }
 
-         // Strategy 3: configured codex_api_port
-        let codex_url = config.codex_api_base_url();
-        if endpoint_responds(&codex_url, 2) {
-            if let Some((pid, _method)) = detect_process_on_port(config.codex_api_port()) {
-                return CodexProcessInfo {
-                    running: true,
-                    pid: Some(pid),
-                    method: Some("codex_api_port".to_string()),
-                    restart_required: true,
-                  };
-               }
+    let codex_health_url = format!("{}/health", config.codex_api_base_url());
+    if endpoint_responds(&codex_health_url, 2) {
+        if let Some((pid, _method)) = detect_process_on_port(config.codex_api_port()) {
             return CodexProcessInfo {
                 running: true,
-                pid: None,
+                pid: Some(pid),
                 method: Some("codex_api_port".to_string()),
                 restart_required: true,
-              };
-           }
-
-           // Strategy 4: ollamaIp:ollamaPort for /api/tags
-        if let Some(ollama_ip) = config.ollama_ip.as_ref().map(|s| s.as_str()) {
-            let port = config.ollama_port.unwrap_or(11434);
-            let ollama_url = format!("http://{}:{}/api/tags", ollama_ip, port);
-            if endpoint_responds(&ollama_url, 2) {
-                if let Some((pid, _method)) = detect_process_on_port(port) {
-                    return CodexProcessInfo {
-                        running: true,
-                        pid: Some(pid),
-                        method: Some("ollama_port".to_string()),
-                        restart_required: false,
-                      };
-                   }
-                return CodexProcessInfo {
-                    running: true,
-                    pid: None,
-                    method: Some("ollama_port".to_string()),
-                    restart_required: false,
-                  };
-               }
-           }
-
-           // Strategy 5: scan common ports
-        let common_ports = [11434u16, 8080u16, 8000u16, 3000u16];
-        for port in &common_ports {
-            if endpoint_responds(&format!("http://127.0.0.1:{}", port), 1) {
-                if let Some((pid, _method)) = detect_process_on_port(*port) {
-                    return CodexProcessInfo {
-                        running: true,
-                        pid: Some(pid),
-                        method: Some("common_port".to_string()),
-                        restart_required: true,
-                      };
-                   }
-                return CodexProcessInfo {
-                    running: true,
-                    pid: None,
-                    method: Some(format!("port_{}", port)),
-                    restart_required: true,
-                  };
-               }
-           }
-
-        CodexProcessInfo {
-            running: false,
+            };
+        }
+        return CodexProcessInfo {
+            running: true,
             pid: None,
-            method: None,
-            restart_required: false,
-          }
+            method: Some("codex_api_port".to_string()),
+            restart_required: true,
+        };
+    }
+
+    CodexProcessInfo {
+        running: false,
+        pid: None,
+        method: None,
+        restart_required: false,
+    }
+}
+
+fn is_launcher_process_name(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.contains("codex-local-launcher") || lower.contains("codex_local_launcher")
 }
 
 /// Detect if a Codex process is running by name (cross-platform).
@@ -385,21 +414,22 @@ fn detect_codex_by_name() -> Option<CodexProcessInfo> {
                       let stdout = String::from_utf8_lossy(&output.stdout);
                       for line in stdout.lines() {
                           let lower = line.to_lowercase();
-                          if lower.contains("codex") {
-                              let parts: Vec<&str> = line.split(',').collect();
-                              if parts.len() >= 2 {
-                                  if let Ok(pid) = parts[1].trim().trim_matches('"').parse::<u32>() {
-                                      return Some(CodexProcessInfo {
-                                          running: true,
-                                          pid: Some(pid),
-                                          method: Some("process_name".to_string()),
-                                          restart_required: true,
-                                         });
-                                       }
-                                   }
-                               }
+                          if !lower.contains("codex") || is_launcher_process_name(line) {
+                              continue;
                           }
-                   }
+                          let parts: Vec<&str> = line.split(',').collect();
+                          if parts.len() >= 2 {
+                              if let Ok(pid) = parts[1].trim().trim_matches('"').parse::<u32>() {
+                                  return Some(CodexProcessInfo {
+                                      running: true,
+                                      pid: Some(pid),
+                                      method: Some("process_name".to_string()),
+                                      restart_required: true,
+                                  });
+                              }
+                          }
+                      }
+                  }
               }
           #[cfg(target_os = "macos")]
           {
@@ -439,23 +469,20 @@ fn detect_codex_by_name() -> Option<CodexProcessInfo> {
                               }
                           }
                       }
-                  // Fallback: case-insensitive check for any codex-related process
-                  let lower = stdout.to_lowercase();
-                  if lower.contains("codex") {
-                      for line in stdout.lines() {
-                          if line.to_lowercase().contains("codex") {
-                              let pid_str = line.split_whitespace().next()?;
-                              if let Ok(pid) = pid_str.parse::<u32>() {
-                                  return Some(CodexProcessInfo {
-                                      running: true,
-                                      pid: Some(pid),
-                                      method: Some("process_name".to_string()),
-                                      restart_required: true,
-                                      });
-                                    }
-                                }
-                            }
-                          }
+                  for line in stdout.lines() {
+                      if !line.to_lowercase().contains("codex") || is_launcher_process_name(line) {
+                          continue;
+                      }
+                      let pid_str = line.split_whitespace().next()?;
+                      if let Ok(pid) = pid_str.parse::<u32>() {
+                          return Some(CodexProcessInfo {
+                              running: true,
+                              pid: Some(pid),
+                              method: Some("process_name".to_string()),
+                              restart_required: true,
+                          });
+                      }
+                  }
               }
         #[cfg(target_os = "linux")]
         {
@@ -468,14 +495,24 @@ fn detect_codex_by_name() -> Option<CodexProcessInfo> {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 for pid_str in stdout.lines() {
                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                        let ps = Command::new("ps")
+                            .args(["-p", &pid.to_string(), "-o", "args="])
+                            .output()
+                            .ok();
+                        if let Some(output) = ps {
+                            let cmdline = String::from_utf8_lossy(&output.stdout);
+                            if is_launcher_process_name(&cmdline) {
+                                continue;
+                            }
+                        }
                         return Some(CodexProcessInfo {
                             running: true,
                             pid: Some(pid),
                             method: Some("process_name".to_string()),
                             restart_required: true,
-                         });
-                     }
-                 }
+                        });
+                    }
+                }
                 if !stdout.trim().is_empty() {
                     return Some(CodexProcessInfo {
                         running: true,

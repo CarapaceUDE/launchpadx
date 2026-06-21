@@ -19,6 +19,47 @@ pub struct RpcState {
 const ICON_FILENAME: &str = "icon.ico";
 const ICON_PNG: &str = "icon.png";
 const DIST_DIR: &str = "web/dist";
+const DIST_INDEX: &str = "web/dist/index.html";
+
+/// Locate the directory that contains `web/dist/index.html` at runtime.
+/// The GUI must not rely on compile-time `CARGO_MANIFEST_DIR` — the binary may
+/// be launched from `target/release/` or another checkout.
+pub fn resolve_gui_root() -> PathBuf {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        for _ in 0..6 {
+            if let Some(ref d) = dir {
+                candidates.push(d.clone());
+                dir = d.parent().map(|p| p.to_path_buf());
+            } else {
+                break;
+            }
+        }
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd);
+    }
+
+    candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+
+    for root in candidates {
+        if root.join(DIST_INDEX).is_file() {
+            eprintln!("[GUI] Resolved app root: {}", root.display());
+            return root;
+        }
+    }
+
+    let fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    eprintln!(
+        "[GUI] Warning: {} not found; falling back to {}",
+        DIST_INDEX,
+        fallback.display()
+    );
+    fallback
+}
 
 fn resolve_icon_path(root: &Path) -> PathBuf {
     let candidates = [
@@ -146,13 +187,15 @@ pub fn launch_web_gui(root: PathBuf, config_path: PathBuf) -> Result<(), Box<dyn
             stop: function() { return this.call("stop", {}); },
             saveConfig: function(cfg) { return this.call("saveConfig", cfg); },
             loadConfig: function() { return this.call("loadConfig", {}); },
-            healthCheck: function() { return this.call("healthCheck", {}); },
+            healthCheck: function(cfg) { return this.call("healthCheck", cfg || {}); },
             listModels: function() { return this.call("listModels", {}); },
-            refreshModels: function() { return this.call("refreshModels", {}); },
+            refreshModels: function(cfg) { return this.call("refreshModels", cfg || {}); },
             writeCodexConfig: function() { return this.call("writeCodexConfig", {}); },
             revertCodexConfig: function() { return this.call("revertCodexConfig", {}); },
             detectCodex: function() { return this.call("detectCodex", {}); },
-            killCodexByPid: function(pid) { return this.call("killCodexByPid", { pid }); }
+            killCodexByPid: function(pid) { return this.call("killCodexByPid", { pid }); },
+            openDirectoryPicker: function() { return this.call("openDirectoryPicker", {}); },
+            getAppLogs: function() { return this.call("getAppLogs", {}); }
           };
           "#.to_string(),
       );
@@ -189,14 +232,16 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
           "saveConfig" => rpc_save_config(state, params),
           "launch" => rpc_launch(state),
           "stop" => rpc_stop(state),
-          "healthCheck" => rpc_health_check(state),
+          "healthCheck" => rpc_health_check(state, params),
           "listModels" => rpc_list_models(state),
-          "refreshModels" => rpc_refresh_models(state),
+          "refreshModels" => rpc_refresh_models(state, params),
           "writeCodexConfig" => rpc_write_codex_config(state),
           "revertCodexConfig" => rpc_revert_codex_config(state),
           "detectCodex" => rpc_detect_codex(state),
           "killCodexByPid" => rpc_kill_codex_by_pid(params),
           "toggleAutoStart" => rpc_toggle_auto_start(state),
+          "openDirectoryPicker" => rpc_open_directory_picker(),
+          "getAppLogs" => rpc_get_app_logs(state),
           _ => serde_json::json!({"error": format!("Unknown method: {}", method)}),
       }
 }
@@ -208,11 +253,42 @@ fn rpc_load_config(state: &RpcState) -> serde_json::Value {
       }
 }
 
+fn config_for_request(state: &RpcState, params: &serde_json::Value) -> Result<LauncherConfig, String> {
+    let incoming = serde_json::from_value::<LauncherConfig>(params.clone()).ok();
+    let has_overlay = incoming.as_ref().is_some_and(|cfg| {
+        cfg.ollama_ip.is_some()
+            || cfg.openai_base_url.is_some()
+            || cfg.ollama_port.is_some()
+            || cfg.ollama_scheme.is_some()
+            || cfg.codex_model.is_some()
+    });
+
+    if has_overlay {
+        let Some(incoming) = incoming else {
+            return Err("Invalid config JSON".to_string());
+        };
+        match LauncherConfig::read(&state.config_path) {
+            Ok(mut existing) => {
+                existing.merge_from(&incoming);
+                Ok(existing)
+            }
+            Err(_) => Ok(incoming),
+        }
+    } else {
+        LauncherConfig::read(&state.config_path).map_err(|e| e.to_string())
+    }
+}
+
 fn rpc_save_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
-    let config: LauncherConfig = match serde_json::from_value(params) {
+    let incoming: LauncherConfig = match serde_json::from_value(params) {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Invalid config JSON: {}", e)}),
       };
+    let mut config = match LauncherConfig::read(&state.config_path) {
+        Ok(existing) => existing,
+        Err(_) => LauncherConfig::default(),
+      };
+    config.merge_from(&incoming);
     match config.write(&state.config_path) {
         Ok(_) => serde_json::json!({"ok": true}),
         Err(e) => serde_json::json!({"error": e.to_string()}),
@@ -224,45 +300,47 @@ fn rpc_launch(state: &RpcState) -> serde_json::Value {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
       };
+    if let Err(e) = app_logic::write_config(&config) {
+        return serde_json::json!({"error": e.to_string()});
+    }
     let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
     match app_logic::launch(&config, &state.root, &pid_file) {
-        Ok(pid) => serde_json::json!({"ok": true, "pid": pid}),
+        Ok(message) => serde_json::json!({"ok": true, "message": message}),
         Err(e) => serde_json::json!({"error": e.to_string()}),
       }
 }
 
 fn rpc_stop(state: &RpcState) -> serde_json::Value {
-    let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
-    match app_logic::kill_codex_by_pid(&pid_file) {
-        Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
-        Err(e) => serde_json::json!({"ok": false, "message": e.to_string()}),
-      }
-}
-
-fn rpc_health_check(state: &RpcState) -> serde_json::Value {
     let config = match LauncherConfig::read(&state.config_path) {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
       };
-    let base_url = config.openai_base_url.clone().unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
-    let client = reqwest::blocking::Client::new();
-    let url = format!("{}/api/tags", base_url.trim_end_matches('/'));
-    match client.get(&url).send() {
-        Ok(resp) => {
-            let status = resp.status().as_u16();
-            serde_json::json!({
-                  "running": status >= 200 && status < 300,
-                  "api_ready": status >= 200 && status < 300,
-                  "endpoint": base_url
-               })
-          }
-        Err(e) => serde_json::json!({
-             "running": false,
-             "api_ready": false,
-             "endpoint": base_url,
-             "error": e.to_string()
-          }),
+    let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+    match app_logic::stop_codex(&config, &state.root, &pid_file) {
+        Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
+        Err(e) => serde_json::json!({"error": e.to_string()}),
       }
+}
+
+fn rpc_health_check(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_request(state, &params) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": e}),
+      };
+    let codex = app_logic::detect_codex_process(&config, &state.root);
+    let endpoint_ready = app_logic::endpoint_reachable(&config);
+    let api_ready = if codex.running {
+        app_logic::codex_api_ready(&config)
+    } else {
+        false
+    };
+    serde_json::json!({
+        "running": codex.running,
+        "apiReady": api_ready,
+        "endpointReady": endpoint_ready,
+        "pid": codex.pid,
+        "method": codex.method,
+    })
 }
 
 fn rpc_list_models(state: &RpcState) -> serde_json::Value {
@@ -282,14 +360,18 @@ fn rpc_list_models(state: &RpcState) -> serde_json::Value {
               }).collect();
             serde_json::json!({"models": models})
           }
-        Err(e) => serde_json::json!({"error": e.to_string(), "models": []}),
+        Err(e) => serde_json::json!({"error": e.to_string()}),
       }
 }
 
-fn rpc_refresh_models(state: &RpcState) -> serde_json::Value {
-    let config = match LauncherConfig::read(&state.config_path) {
+fn rpc_refresh_models(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_request(state, &params) {
         Ok(c) => c,
-        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+        Err(e) => return serde_json::json!({"error": e}),
+      };
+    let endpoint = match config.openai_base_url() {
+        Ok(url) => url,
+        Err(e) => return serde_json::json!({"error": e.to_string()}),
       };
     match app_logic::refresh_models(&config) {
         Ok(cache) => {
@@ -301,9 +383,17 @@ fn rpc_refresh_models(state: &RpcState) -> serde_json::Value {
                       "modified": m.modified_at.clone().unwrap_or_default(),
                   })
               }).collect();
-            serde_json::json!({"ok": true, "models": models, "message": "Model cache refreshed"})
+            serde_json::json!({
+                "ok": true,
+                "models": models,
+                "endpoint": endpoint,
+                "fetchedFrom": cache.fetched_from,
+                "message": format!("Found {} model(s) from {}", models.len(), cache.fetched_from),
+            })
           }
-        Err(e) => serde_json::json!({"error": e.to_string(), "models": []}),
+        Err(e) => serde_json::json!({
+            "error": format!("{e} (endpoint: {endpoint})"),
+        }),
       }
 }
 
@@ -334,7 +424,7 @@ fn rpc_detect_codex(state: &RpcState) -> serde_json::Value {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
       };
-    let info = app_logic::detect_codex_process(&config);
+    let info = app_logic::detect_codex_process(&config, &state.root);
     serde_json::to_value(info).unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize"}))
 }
 
@@ -347,6 +437,37 @@ fn rpc_kill_codex_by_pid(params: serde_json::Value) -> serde_json::Value {
         Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
         Err(e) => serde_json::json!({"error": e.to_string()}),
       }
+}
+
+fn rpc_open_directory_picker() -> serde_json::Value {
+    match rfd::FileDialog::new().pick_folder() {
+        Some(path) => serde_json::json!({"path": path.to_string_lossy().to_string()}),
+        None => serde_json::json!({"path": ""}),
+    }
+}
+
+fn rpc_get_app_logs(state: &RpcState) -> serde_json::Value {
+    let logs_path = state.root.join("app.log");
+    let entries: Vec<serde_json::Value> = match std::fs::read_to_string(&logs_path) {
+        Ok(content) => content
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let (level, message) = if let Some(rest) = line.strip_prefix('[') {
+                    if let Some((lvl, msg)) = rest.split_once(']') {
+                        (lvl.trim().to_string(), msg.trim().to_string())
+                    } else {
+                        ("INFO".to_string(), line.to_string())
+                    }
+                } else {
+                    ("INFO".to_string(), line.to_string())
+                };
+                serde_json::json!({"level": level, "message": message})
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    serde_json::json!({"logs": entries})
 }
 
 fn rpc_toggle_auto_start(state: &RpcState) -> serde_json::Value {

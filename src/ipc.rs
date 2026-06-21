@@ -68,6 +68,10 @@ fn do_launch(state: &IpcState) -> IpcResponse {
         Err(e) => return IpcResponse::err(format!("Cannot read config: {e}")),
         };
 
+    if let Err(e) = app_logic::write_config(&config) {
+        return IpcResponse::err(format!("Failed to write Codex config: {e}"));
+    }
+
     let pid_file = app_logic::codex_pid_file(&state.config_path);
 
     match app_logic::launch(&config, &state.root, &pid_file) {
@@ -77,11 +81,15 @@ fn do_launch(state: &IpcState) -> IpcResponse {
 }
 
 fn do_stop(state: &IpcState) -> IpcResponse {
-    // First try killing by PID file if the process handle isn't available
-    match app_logic::kill_codex_by_pid(&app_logic::codex_pid_file(&state.config_path)) {
+    let config = match LauncherConfig::read(&state.config_path) {
+        Ok(c) => c,
+        Err(e) => return IpcResponse::err(format!("Cannot read config: {e}")),
+    };
+    let pid_file = app_logic::codex_pid_file(&state.config_path);
+    match app_logic::stop_codex(&config, &state.root, &pid_file) {
         Ok(msg) => IpcResponse::ok(serde_json::json!({ "message": msg })),
         Err(e) => IpcResponse::err(format!("Failed to stop: {e}")),
-        }
+    }
 }
 
 fn do_save_config(state: &IpcState, payload: &serde_json::Value) -> IpcResponse {
@@ -203,7 +211,7 @@ fn do_detect_codex(state: &IpcState) -> IpcResponse {
         Err(e) => return IpcResponse::err(format!("Cannot read config: {e}")),
         };
 
-    let info = app_logic::detect_codex_process(&config);
+    let info = app_logic::detect_codex_process(&config, &state.root);
     IpcResponse::ok(serde_json::json!({
         "running": info.running,
         "pid": info.pid,

@@ -117,30 +117,52 @@ impl LauncherConfig {
 
 
     pub fn openai_base_url(&self) -> Result<String, ConfigError> {
+        if let Some(host) = non_empty(&self.ollama_ip) {
+            if host == "100.64.0.10" {
+                return Err(ConfigError::ExampleOllamaIp);
+            }
+
+            if host.starts_with("http://") || host.starts_with("https://") {
+                return Ok(ensure_v1(host));
+            }
+
+            let scheme = non_empty(&self.ollama_scheme).unwrap_or_else(|| "http".to_string());
+            let port = self.ollama_port.unwrap_or(11434);
+            let host = if host.contains(':') {
+                format!("[{host}]")
+            } else {
+                host
+            };
+
+            return Ok(format!("{scheme}://{host}:{port}/v1"));
+        }
+
         if let Some(base_url) = non_empty(&self.openai_base_url) {
             return Ok(ensure_v1(base_url));
         }
 
-        let Some(host) = non_empty(&self.ollama_ip) else {
-            return Err(ConfigError::MissingBaseUrl);
-        };
-        if host == "100.64.0.10" {
-            return Err(ConfigError::ExampleOllamaIp);
-        }
+        Err(ConfigError::MissingBaseUrl)
+    }
 
-        if host.starts_with("http://") || host.starts_with("https://") {
-            return Ok(ensure_v1(host));
-        }
-
-        let scheme = non_empty(&self.ollama_scheme).unwrap_or_else(|| "http".to_string());
-        let port = self.ollama_port.unwrap_or(11434);
-        let host = if host.contains(':') {
-            format!("[{host}]")
-        } else {
-            host
-        };
-
-        Ok(format!("{scheme}://{host}:{port}/v1"))
+    pub fn merge_from(&mut self, other: &LauncherConfig) {
+        merge_option(&mut self.auto_start, &other.auto_start);
+        merge_option(&mut self.openai_base_url, &other.openai_base_url);
+        merge_option(&mut self.ollama_ip, &other.ollama_ip);
+        merge_option(&mut self.ollama_port, &other.ollama_port);
+        merge_option(&mut self.ollama_scheme, &other.ollama_scheme);
+        merge_option(&mut self.api_key, &other.api_key);
+        merge_option(&mut self.persist_codex_config, &other.persist_codex_config);
+        merge_option(&mut self.codex_model, &other.codex_model);
+        merge_option(&mut self.codex_provider_id, &other.codex_provider_id);
+        merge_option(&mut self.codex_provider_name, &other.codex_provider_name);
+        merge_option(&mut self.codex_api_key_mode, &other.codex_api_key_mode);
+        merge_option(&mut self.codex_config_path, &other.codex_config_path);
+        merge_option(&mut self.codex_command, &other.codex_command);
+        merge_option(&mut self.codex_api_port, &other.codex_api_port);
+        merge_option(&mut self.codex_api_scheme, &other.codex_api_scheme);
+        merge_option(&mut self.discover_ollama_models, &other.discover_ollama_models);
+        merge_option(&mut self.codex_args, &other.codex_args);
+        merge_option(&mut self.working_directory, &other.working_directory);
     }
 
     pub fn api_key(&self) -> Result<String, ConfigError> {
@@ -218,6 +240,12 @@ impl LauncherConfig {
             return Err(ConfigError::MissingWorkingDirectory(path));
         }
         Ok(path)
+    }
+}
+
+fn merge_option<T: Clone>(target: &mut Option<T>, incoming: &Option<T>) {
+    if incoming.is_some() {
+        *target = incoming.clone();
     }
 }
 

@@ -99,6 +99,11 @@ pub fn resolve_model(
     }
 }
 
+pub fn tags_url_from_base(base_url: &str) -> Result<String, OllamaError> {
+    let api_root = derive_ollama_api_root(base_url)?;
+    Ok(format!("{api_root}/tags"))
+}
+
 pub fn refresh_model_cache(
     base_url: &str,
     api_key: Option<&str>,
