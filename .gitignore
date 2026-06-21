@@ -1,0 +1,26 @@
+# Local config and secrets
+config.json
+*.local.json
+*.local.toml
+.env
+.env.*
+!.env.example
+
+# Rust build output
+/target/
+
+# Temporary workspace data
+/.tmp/
+/tmp/
+
+# Logs and diagnostics
+*.log
+*.trace
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

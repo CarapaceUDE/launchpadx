@@ -1,0 +1,17 @@
+﻿{
+    "autoStart": false,
+    "ollamaIp": "100.64.0.10",
+    "ollamaPort": 11434,
+    "ollamaScheme": "http",
+    "apiKey": "replace-with-your-api-key",
+    "persistCodexConfig": true,
+    "discoverOllamaModels": true,
+    "codexModel": "",
+    "codexProviderId": "codex-local-launcher",
+    "codexProviderName": "Local Ollama",
+    "codexApiKeyMode": "experimentalBearerToken",
+    "codexConfigPath": "",
+    "codexCommand": "",
+    "codexArgs": [],
+    "workingDirectory": ""
+}

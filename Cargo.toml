@@ -1,0 +1,25 @@
+﻿[package]
+name = "codex-local-launcher"
+version = "0.1.0"
+repository = "https://github.com/codex-local-launcher/codex-local-launcher"
+edition = "2021"
+description = "Launch Codex against an Ollama-compatible OpenAI endpoint."
+license = "MIT"
+
+[dependencies]
+dirs = "5"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time"] }
+toml_edit = "0.22"
+wry = { version = "0.46", features = ["protocol"] }
+tao = "0.29"
+tiny_http = "0.12"
+image = { version = "0.25", default-features = false, features = ["png"] }
+rfd = "0.14"
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+default = []
