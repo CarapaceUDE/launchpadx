@@ -1,5 +1,6 @@
 ﻿{
     "autoStart": false,
+    "openaiBaseUrl": "",
     "ollamaIp": "100.64.0.10",
     "ollamaPort": 11434,
     "ollamaScheme": "http",
@@ -12,6 +13,8 @@
     "codexApiKeyMode": "experimentalBearerToken",
     "codexConfigPath": "",
     "codexCommand": "",
+    "codexApiPort": 4000,
+    "codexApiScheme": "http",
     "codexArgs": [],
     "workingDirectory": ""
 }

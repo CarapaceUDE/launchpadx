@@ -80,6 +80,9 @@ export function GeneralSettingsCard({
           {apiKeyWarning && (
             <p className="mt-1.5 text-[12px] text-warning-fg">{apiKeyWarning}</p>
           )}
+          <p className="mt-1.5 text-[12px] text-muted-foreground">
+            Stored locally in <code>config.json</code>. The launcher redacts this value in diagnostics and logs.
+          </p>
         </FormField>
 
         <div className="border-t border-border pt-3">

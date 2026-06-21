@@ -47,7 +47,7 @@ pub enum OllamaError {
     AmbiguousModelSelection,
     #[error("no Ollama models were discovered from {0}")]
     NoModelsDiscovered(String),
-     #[error("model cache expired")]
+    #[error("model cache expired")]
     CacheExpired,
 }
 
@@ -141,9 +141,9 @@ pub fn refresh_model_cache(
     })?;
 
     let now = std::time::SystemTime::now()
-          .duration_since(std::time::UNIX_EPOCH)
-          .map(|d| d.as_secs())
-          .unwrap_or(0);
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
     let cache = ModelCache {
         api_root,
         fetched_from: url,
@@ -155,7 +155,7 @@ pub fn refresh_model_cache(
 }
 
 pub const fn cache_ttl_secs() -> u64 {
-     300 // 5 minutes
+    300 // 5 minutes
 }
 
 pub fn read_model_cache() -> Result<ModelCache, OllamaError> {
@@ -164,8 +164,9 @@ pub fn read_model_cache() -> Result<ModelCache, OllamaError> {
         path: path.clone(),
         source,
     })?;
-    let cache: ModelCache = serde_json::from_str(&data).map_err(|source| OllamaError::ParseCache { path, source })?;
-     // Check cache TTL - expire after 5 minutes
+    let cache: ModelCache =
+        serde_json::from_str(&data).map_err(|source| OllamaError::ParseCache { path, source })?;
+    // Check cache TTL - expire after 5 minutes
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())

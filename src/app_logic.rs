@@ -1,25 +1,25 @@
-﻿use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
 use crate::acp_client::{AcpClient, MessageResponse};
 use crate::codex_config;
 use crate::codex_process::{CodexProcess, CodexProcessInfo, ProcessState};
 use crate::config::LauncherConfig;
 use crate::launcher::{self, LaunchTarget};
 use crate::ollama;
+use std::error::Error;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub fn default_config_path(root: &Path) -> PathBuf {
     let packaged_config = root.join("config.json");
     if packaged_config.exists() {
         packaged_config
-     } else {
+    } else {
         PathBuf::from("config.json")
-     }
+    }
 }
 
 pub fn codex_pid_file(config_path: &Path) -> PathBuf {
-     // Place PID file next to config
+    // Place PID file next to config
     config_path.with_extension("pid")
 }
 
@@ -28,9 +28,9 @@ pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
     let api_key = config.api_key()?;
     let resolved_model = if config.discover_ollama_models() {
         ollama::resolve_model(config, &base_url)?
-     } else {
+    } else {
         config.codex_model()
-     };
+    };
 
     if config.persist_codex_config() {
         let persistent_config = codex_config::PersistentCodexConfig::from_launcher_config(
@@ -38,11 +38,11 @@ pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
             resolved_model,
             base_url,
             api_key,
-         )?;
+        )?;
         let path = persistent_config.config_path.display().to_string();
         codex_config::apply(&persistent_config)?;
         return Ok(format!("Updated Codex config: {path}"));
-     }
+    }
 
     Ok("Persistent Codex config is disabled; nothing was written.".to_string())
 }
@@ -50,18 +50,18 @@ pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
 pub fn restore(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
     let restored_path = codex_config::restore(config)?;
     Ok(format!(
-         "Restored Codex config: {}",
+        "Restored Codex config: {}",
         restored_path.display()
-     ))
+    ))
 }
 
 pub fn refresh_models(config: &LauncherConfig) -> Result<ollama::ModelCache, Box<dyn Error>> {
     let base_url = config.openai_base_url()?;
     let optional_api_key = config.api_key_if_configured();
     Ok(ollama::refresh_model_cache(
-         &base_url,
+        &base_url,
         optional_api_key.as_deref(),
-     )?)
+    )?)
 }
 
 pub fn list_models(config: &LauncherConfig) -> Result<ollama::ModelCache, Box<dyn Error>> {
@@ -70,10 +70,10 @@ pub fn list_models(config: &LauncherConfig) -> Result<ollama::ModelCache, Box<dy
     match ollama::read_model_cache() {
         Ok(cache) => Ok(cache),
         Err(_) => Ok(ollama::refresh_model_cache(
-             &base_url,
+            &base_url,
             optional_api_key.as_deref(),
-         )?),
-     }
+        )?),
+    }
 }
 
 pub fn launch(
@@ -98,7 +98,7 @@ pub fn launch(
         LaunchTarget::Path(path) => {
             let command = path
                 .to_str()
-                .ok_or_else(|| "Resolved Codex path is not valid UTF-8")?;
+                .ok_or("Resolved Codex path is not valid UTF-8")?;
             CodexProcess::spawn(
                 command,
                 &working_directory,
@@ -134,7 +134,7 @@ pub async fn launch_and_wait(
         LaunchTarget::Path(path) => {
             let command = path
                 .to_str()
-                .ok_or_else(|| "Resolved Codex path is not valid UTF-8")?;
+                .ok_or("Resolved Codex path is not valid UTF-8")?;
             CodexProcess::spawn(
                 command,
                 &working_directory,
@@ -200,7 +200,8 @@ pub fn stop_codex(
                 return kill_codex_by_pid_number(pid);
             }
             return Err(
-                "Detected a running backend service, not the Codex app; refusing to stop it.".into(),
+                "Detected a running backend service, not the Codex app; refusing to stop it."
+                    .into(),
             );
         }
         return Err("Codex appears to be running but no PID was found to stop.".into());
@@ -267,11 +268,11 @@ pub async fn list_sessions(config: &LauncherConfig) -> Result<String, Box<dyn Er
     let mut output = String::new();
     for s in &sessions.sessions {
         output.push_str(&format!(
-             "   {} - created {}\n",
+            "   {} - created {}\n",
             s.session_id,
             s.created_at.as_deref().unwrap_or("unknown")
-         ));
-     }
+        ));
+    }
     Ok(output)
 }
 
@@ -279,18 +280,18 @@ pub fn enable_auto_start(config: &LauncherConfig) -> Result<String, Box<dyn std:
     if config.auto_start.unwrap_or(false) {
         launcher::autostart::enable_auto_start()?;
         Ok("Auto-start enabled.".to_string())
-     } else {
+    } else {
         Ok("Auto-start is already disabled.".to_string())
-     }
+    }
 }
 
 pub fn disable_auto_start(config: &LauncherConfig) -> Result<String, Box<dyn std::error::Error>> {
     if !config.auto_start.unwrap_or(false) {
         Ok("Auto-start is already disabled.".to_string())
-     } else {
+    } else {
         launcher::autostart::disable_auto_start()?;
         Ok("Auto-start disabled.".to_string())
-     }
+    }
 }
 
 /// Detect whether the Codex desktop app is running.
@@ -364,147 +365,68 @@ fn is_launcher_process_name(name: &str) -> bool {
 /// This handles the common case where Codex was launched externally
 /// (user opened it manually, auto-started, etc.) rather than via this launcher.
 fn detect_codex_by_name() -> Option<CodexProcessInfo> {
-        #[cfg(target_os = "windows")]
-
-         {
-              // Use tasklist to find Codex/codex processes
-              // Try all known Codex binary names, in order of likelihood
-              let binary_names = ["Codex.exe", "codex.exe", "codex-app.exe", "codex-app", "codex.cmd", "codex.ps1"];
-              for &name in &binary_names {
-                  let output = Command::new("tasklist")
-                               .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
-                               .output()
-                               .ok()?;
-                  if output.status.success() {
-                      let stdout = String::from_utf8_lossy(&output.stdout);
-                      if stdout.contains(name) {
-                              // Extract PID from CSV output (PID is second field)
-                          for line in stdout.lines() {
-                              if line.contains(name) {
-                                  let parts: Vec<&str> = line.split(',').collect();
-                                  if parts.len() >= 2 {
-                                      if let Ok(pid) = parts[1].trim().trim_matches('"').parse::<u32>() {
-                                          return Some(CodexProcessInfo {
-                                              running: true,
-                                              pid: Some(pid),
-                                              method: Some("process_name".to_string()),
-                                              restart_required: true,
-                                             });
-                                           }
-                                       }
-                                   }
-                                  }
-                                 // Found at least one Codex process but couldn't parse PID
-                                return Some(CodexProcessInfo {
-                                    running: true,
-                                    pid: None,
-                                    method: Some("process_name".to_string()),
-                                    restart_required: true,
-                                   });
-                               }
-                          }
-                   }
-                   // Catch-all: search for any process whose name contains "codex" (case-insensitive)
-                   // tasklist /FI doesn't support "contains", so we list all and filter
-                  let output = Command::new("tasklist")
-                               .args(["/FO", "CSV", "/NH"])
-                               .output()
-                               .ok()?;
-                  if output.status.success() {
-                      let stdout = String::from_utf8_lossy(&output.stdout);
-                      for line in stdout.lines() {
-                          let lower = line.to_lowercase();
-                          if !lower.contains("codex") || is_launcher_process_name(line) {
-                              continue;
-                          }
-                          let parts: Vec<&str> = line.split(',').collect();
-                          if parts.len() >= 2 {
-                              if let Ok(pid) = parts[1].trim().trim_matches('"').parse::<u32>() {
-                                  return Some(CodexProcessInfo {
-                                      running: true,
-                                      pid: Some(pid),
-                                      method: Some("process_name".to_string()),
-                                      restart_required: true,
-                                  });
-                              }
-                          }
-                      }
-                  }
-              }
-          #[cfg(target_os = "macos")]
-          {
-               // Use ps to find Codex processes
-               // Try multiple possible binary names
-              let names = ["Codex", "codex", "codex-app"];
-              let output = Command::new("ps")
-                           .args(["-ax"])
-                           .output()
-                           .ok()?;
-              if output.status.success() {
-                  let stdout = String::from_utf8_lossy(&output.stdout);
-                  // Check if any known Codex binary is running
-                  for name in &names {
-                      if stdout.contains(name) {
-                           // Extract PID (first field in ps -ax output)
-                          for line in stdout.lines() {
-                              if line.contains(name) {
-                                  let pid_str = line.split_whitespace().next()?;
-                                  if let Ok(pid) = pid_str.parse::<u32>() {
-                                      return Some(CodexProcessInfo {
-                                          running: true,
-                                          pid: Some(pid),
-                                          method: Some("process_name".to_string()),
-                                          restart_required: true,
-                                          });
-                                        }
-                                    }
-                                }
-                              // Found at least one Codex process but couldn't parse PID
-                              return Some(CodexProcessInfo {
-                                  running: true,
-                                  pid: None,
-                                  method: Some("process_name".to_string()),
-                                  restart_required: true,
-                                  });
-                              }
-                          }
-                      }
-                  for line in stdout.lines() {
-                      if !line.to_lowercase().contains("codex") || is_launcher_process_name(line) {
-                          continue;
-                      }
-                      let pid_str = line.split_whitespace().next()?;
-                      if let Ok(pid) = pid_str.parse::<u32>() {
-                          return Some(CodexProcessInfo {
-                              running: true,
-                              pid: Some(pid),
-                              method: Some("process_name".to_string()),
-                              restart_required: true,
-                          });
-                      }
-                  }
-              }
-        #[cfg(target_os = "linux")]
-        {
-             // Use pgrep to find codex processes
-            let output = Command::new("sh")
-                     .args(["-c", "pgrep -f codex"])
-                     .output()
-                     .ok()?;
+    #[cfg(target_os = "windows")]
+    {
+        // Use tasklist to find Codex/codex processes
+        // Try all known Codex binary names, in order of likelihood
+        let binary_names = [
+            "Codex.exe",
+            "codex.exe",
+            "codex-app.exe",
+            "codex-app",
+            "codex.cmd",
+            "codex.ps1",
+        ];
+        for &name in &binary_names {
+            let output = Command::new("tasklist")
+                .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
+                .output()
+                .ok()?;
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
-                for pid_str in stdout.lines() {
-                    if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                        let ps = Command::new("ps")
-                            .args(["-p", &pid.to_string(), "-o", "args="])
-                            .output()
-                            .ok();
-                        if let Some(output) = ps {
-                            let cmdline = String::from_utf8_lossy(&output.stdout);
-                            if is_launcher_process_name(&cmdline) {
-                                continue;
+                if stdout.contains(name) {
+                    // Extract PID from CSV output (PID is second field)
+                    for line in stdout.lines() {
+                        if line.contains(name) {
+                            let parts: Vec<&str> = line.split(',').collect();
+                            if parts.len() >= 2 {
+                                if let Ok(pid) = parts[1].trim().trim_matches('"').parse::<u32>() {
+                                    return Some(CodexProcessInfo {
+                                        running: true,
+                                        pid: Some(pid),
+                                        method: Some("process_name".to_string()),
+                                        restart_required: true,
+                                    });
+                                }
                             }
                         }
+                    }
+                    // Found at least one Codex process but couldn't parse PID
+                    return Some(CodexProcessInfo {
+                        running: true,
+                        pid: None,
+                        method: Some("process_name".to_string()),
+                        restart_required: true,
+                    });
+                }
+            }
+        }
+        // Catch-all: search for any process whose name contains "codex" (case-insensitive)
+        // tasklist /FI doesn't support "contains", so we list all and filter
+        let output = Command::new("tasklist")
+            .args(["/FO", "CSV", "/NH"])
+            .output()
+            .ok()?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let lower = line.to_lowercase();
+                if !lower.contains("codex") || is_launcher_process_name(line) {
+                    continue;
+                }
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.len() >= 2 {
+                    if let Ok(pid) = parts[1].trim().trim_matches('"').parse::<u32>() {
                         return Some(CodexProcessInfo {
                             running: true,
                             pid: Some(pid),
@@ -513,178 +435,259 @@ fn detect_codex_by_name() -> Option<CodexProcessInfo> {
                         });
                     }
                 }
-                if !stdout.trim().is_empty() {
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // Use ps to find Codex processes
+        // Try multiple possible binary names
+        let names = ["Codex", "codex", "codex-app"];
+        let output = Command::new("ps").args(["-ax"]).output().ok()?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Check if any known Codex binary is running
+            for name in &names {
+                if stdout.contains(name) {
+                    // Extract PID (first field in ps -ax output)
+                    for line in stdout.lines() {
+                        if line.contains(name) {
+                            let pid_str = line.split_whitespace().next()?;
+                            if let Ok(pid) = pid_str.parse::<u32>() {
+                                return Some(CodexProcessInfo {
+                                    running: true,
+                                    pid: Some(pid),
+                                    method: Some("process_name".to_string()),
+                                    restart_required: true,
+                                });
+                            }
+                        }
+                    }
+                    // Found at least one Codex process but couldn't parse PID
                     return Some(CodexProcessInfo {
                         running: true,
                         pid: None,
                         method: Some("process_name".to_string()),
                         restart_required: true,
-                     });
-                 }
+                    });
+                }
             }
         }
+        for line in stdout.lines() {
+            if !line.to_lowercase().contains("codex") || is_launcher_process_name(line) {
+                continue;
+            }
+            let pid_str = line.split_whitespace().next()?;
+            if let Ok(pid) = pid_str.parse::<u32>() {
+                return Some(CodexProcessInfo {
+                    running: true,
+                    pid: Some(pid),
+                    method: Some("process_name".to_string()),
+                    restart_required: true,
+                });
+            }
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Use pgrep to find codex processes
+        let output = Command::new("sh")
+            .args(["-c", "pgrep -f codex"])
+            .output()
+            .ok()?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for pid_str in stdout.lines() {
+                if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                    let ps = Command::new("ps")
+                        .args(["-p", &pid.to_string(), "-o", "args="])
+                        .output()
+                        .ok();
+                    if let Some(output) = ps {
+                        let cmdline = String::from_utf8_lossy(&output.stdout);
+                        if is_launcher_process_name(&cmdline) {
+                            continue;
+                        }
+                    }
+                    return Some(CodexProcessInfo {
+                        running: true,
+                        pid: Some(pid),
+                        method: Some("process_name".to_string()),
+                        restart_required: true,
+                    });
+                }
+            }
+            if !stdout.trim().is_empty() {
+                return Some(CodexProcessInfo {
+                    running: true,
+                    pid: None,
+                    method: Some("process_name".to_string()),
+                    restart_required: true,
+                });
+            }
+        }
+    }
 
     None
 }
 
 /// Check if a PID is actually running (cross-platform)
 fn is_process_running(pid: u32) -> bool {
-        #[cfg(target_os = "windows")]
-        {
-            let verify = Command::new("tasklist")
-                     .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
-                     .output();
-            match verify {
-                Ok(v) if v.status.success() => {
-                    String::from_utf8_lossy(&v.stdout).contains(&pid.to_string())
-                 }
-                 _ => false,
-             }
-         }
-        #[cfg(not(target_os = "windows"))]
-        {
-            Command::new("kill")
-                     .args(["-0", &pid.to_string()])
-                     .output()
-                     .ok()
-                     .is_some_and(|v| v.status.success())
-         }
+    #[cfg(target_os = "windows")]
+    {
+        let verify = Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+            .output();
+        match verify {
+            Ok(v) if v.status.success() => {
+                String::from_utf8_lossy(&v.stdout).contains(&pid.to_string())
+            }
+            _ => false,
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .output()
+            .ok()
+            .is_some_and(|v| v.status.success())
+    }
 }
 
 /// Check if an endpoint responds to an HTTP request within timeout_secs
 fn endpoint_responds(url: &str, timeout_secs: u64) -> bool {
     reqwest::blocking::Client::new()
-             .get(url)
-             .timeout(std::time::Duration::from_secs(timeout_secs))
-             .send()
-             .map(|r| r.status().is_success())
-             .unwrap_or(false)
+        .get(url)
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .send()
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
 }
 
-
 fn detect_process_on_port(port: u16) -> Option<(u32, String)> {
-       #[cfg(target_os = "windows")]
-       {
-         let output = Command::new("netstat")
-                .args(["-ano"])
-                .output()
-                .ok()?;
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("netstat").args(["-ano"]).output().ok()?;
 
-         let stdout = String::from_utf8_lossy(&output.stdout);
-         let port_str = format!(":{}", port);
-         for line in stdout.lines() {
-             if line.contains(&port_str) && line.contains("LISTENING") {
-                 let parts: Vec<&str> = line.split_whitespace().collect();
-                 if let Some(pid_str) = parts.last() {
-                     if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                           // Verify PID is still alive
-                         let verify = Command::new("tasklist")
-                               .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
-                               .output();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let port_str = format!(":{}", port);
+        for line in stdout.lines() {
+            if line.contains(&port_str) && line.contains("LISTENING") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(pid_str) = parts.last() {
+                    if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                        // Verify PID is still alive
+                        let verify = Command::new("tasklist")
+                            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+                            .output();
 
-                         match verify {
-                            Ok(v) if v.status.success() => {
-                                 if String::from_utf8_lossy(&v.stdout).contains(&pid.to_string()) {
-                                    return Some((pid, "netstat".to_string()));
-                                 }
-                              }
-                               _ => {}
-                           }
-                      }
-                  }
-              }
-          }
-       }
-       #[cfg(not(target_os = "windows"))]
-       {
-           // Try lsof first, fall back to ss if not available
-         let lsof_output = Command::new("sh")
-                .args(["-c", &format!("lsof -i :{} -t 2>/dev/null", port)])
-                .output();
+                        match verify {
+                            Ok(v)
+                                if v.status.success()
+                                    && String::from_utf8_lossy(&v.stdout)
+                                        .contains(&pid.to_string()) =>
+                            {
+                                return Some((pid, "netstat".to_string()));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Try lsof first, fall back to ss if not available
+        let lsof_output = Command::new("sh")
+            .args(["-c", &format!("lsof -i :{} -t 2>/dev/null", port)])
+            .output();
 
-         let stdout = if let Ok(output) = &lsof_output {
-             if output.status.success() {
-                 Some(String::from_utf8_lossy(&output.stdout).to_string())
-                 } else {
-                 None
-                 }
-             } else {
-             None
-             };
+        let stdout = if let Ok(output) = &lsof_output {
+            if output.status.success() {
+                Some(String::from_utf8_lossy(&output.stdout).to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
-         if let Some(pid_str) = stdout.and_then(|s| s.trim().lines().next()) {
-             if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                   // Verify process still exists
-                 let verify = Command::new("kill")
-                        .args(["-0", &pid.to_string()])
-                        .output()
-                        .ok()?;
-                 if verify.status.success() {
-                     return Some((pid, "lsof".to_string()));
-                   }
-               }
-           }
-
-            // Fallback to ss
-         let ss_output = Command::new("sh")
-               .args(["-c", &format!("ss -tlnp sport = :{} 2>/dev/null | grep -oP 'pid=\\\\K[0-9]+'", port)])
-               .output()
-               .ok()?;
-
-         let stdout = String::from_utf8_lossy(&ss_output.stdout);
-         if let Some(pid_str) = stdout.trim().lines().next() {
-             if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                 let verify = Command::new("kill")
-                        .args(["-0", &pid.to_string()])
-                        .output()
-                        .ok()?;
-                 if verify.status.success() {
-                     return Some((pid, "ss".to_string()));
-                   }
-               }
-           }
+        if let Some(pid_str) = stdout.and_then(|s| s.trim().lines().next()) {
+            if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                // Verify process still exists
+                let verify = Command::new("kill")
+                    .args(["-0", &pid.to_string()])
+                    .output()
+                    .ok()?;
+                if verify.status.success() {
+                    return Some((pid, "lsof".to_string()));
+                }
+            }
         }
 
-     None
- }
+        // Fallback to ss
+        let ss_output = Command::new("sh")
+            .args([
+                "-c",
+                &format!(
+                    "ss -tlnp sport = :{} 2>/dev/null | grep -oP 'pid=\\\\K[0-9]+'",
+                    port
+                ),
+            ])
+            .output()
+            .ok()?;
 
+        let stdout = String::from_utf8_lossy(&ss_output.stdout);
+        if let Some(pid_str) = stdout.trim().lines().next() {
+            if let Ok(pid) = pid_str.trim().parse::<u32>() {
+                let verify = Command::new("kill")
+                    .args(["-0", &pid.to_string()])
+                    .output()
+                    .ok()?;
+                if verify.status.success() {
+                    return Some((pid, "ss".to_string()));
+                }
+            }
+        }
+    }
+
+    None
+}
 
 pub fn kill_codex_by_pid_number(pid: u32) -> Result<String, Box<dyn Error>> {
-       #[cfg(target_os = "windows")]
-       {
+    #[cfg(target_os = "windows")]
+    {
         let result = Command::new("taskkill")
-               .args(["/F", "/T", "/PID", &pid.to_string()])
-               .output();
+            .args(["/F", "/T", "/PID", &pid.to_string()])
+            .output();
 
         match result {
-            Ok(output) if output.status.success() => {
-                Ok(format!("Killed Codex process {pid}"))
-               }
+            Ok(output) if output.status.success() => Ok(format!("Killed Codex process {pid}")),
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 Err(format!("Failed to kill process {pid}: {stderr}").into())
-               }
+            }
             Err(e) => Err(format!("Could not run taskkill: {e}").into()),
-           }
-       }
+        }
+    }
 
-       #[cfg(not(target_os = "windows"))]
-       {
+    #[cfg(not(target_os = "windows"))]
+    {
         let result = Command::new("kill")
-               .args(["-TERM", &pid.to_string()])
-               .output();
+            .args(["-TERM", &pid.to_string()])
+            .output();
 
         match result {
-            Ok(output) if output.status.success() => {
-                Ok(format!("Killed Codex process {pid}"))
-               }
+            Ok(output) if output.status.success() => Ok(format!("Killed Codex process {pid}")),
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 Err(format!("Failed to kill process {pid}: {stderr}").into())
-               }
+            }
             Err(e) => Err(format!("Could not run kill: {e}").into()),
-           }
-       }
+        }
+    }
 }
 
 pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
@@ -703,4 +706,3 @@ pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Er
         restored_path.display()
     ))
 }
-

@@ -14,7 +14,7 @@ export function SettingsPanel() {
   const rows = [
     { label: "Endpoint", value: `${scheme}://${ip}:${port}` },
     { label: "Model", value: model || "Not selected" },
-    { label: "API Key", value: apiKey ? `${apiKey.substring(0, 6)}...` : "(not set)" },
+    { label: "API Key", value: apiKey ? "Configured (redacted)" : "(not set)" },
     { label: "Working Dir", value: workingDir || "(default)" },
   ].filter((r) => r.value);
 

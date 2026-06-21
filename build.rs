@@ -1,9 +1,15 @@
 use std::path::Path;
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+const NPM_COMMAND: &str = "npm.cmd";
+#[cfg(not(target_os = "windows"))]
+const NPM_COMMAND: &str = "npm";
+
 fn main() {
     println!("cargo:rerun-if-changed=web/src");
     println!("cargo:rerun-if-changed=web/package.json");
+    println!("cargo:rerun-if-changed=web/package-lock.json");
     println!("cargo:rerun-if-changed=web/vite.config.ts");
 
     let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -11,15 +17,14 @@ fn main() {
     let web_dist = web_dir.join("dist/index.html");
 
     if !web_dist.is_file() {
-        println!("cargo:warning=Web UI not built. Run: cd web && npm run build");
-        let status = Command::new("npm")
+        let status = Command::new(NPM_COMMAND)
             .args(["run", "build"])
             .current_dir(&web_dir)
             .status();
-        if let Ok(status) = status {
-            if !status.success() {
-                println!("cargo:warning=Web UI build failed during cargo build");
-            }
+        match status {
+            Ok(status) if status.success() => {}
+            Ok(_) => println!("cargo:warning=Web UI build failed during cargo build"),
+            Err(err) => println!("cargo:warning=Could not start npm to build web UI: {err}"),
         }
     }
 }

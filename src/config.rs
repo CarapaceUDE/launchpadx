@@ -96,25 +96,24 @@ impl LauncherConfig {
         let data = serde_json::to_string_pretty(self).map_err(|source| ConfigError::Serialize {
             path: path.to_path_buf(),
             source,
-          })?;
+        })?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|source| ConfigError::Write {
                 path: parent.to_path_buf(),
                 source,
-             })?;
-         }
-          // Atomic write: write to temp file then rename to avoid corruption on crash
+            })?;
+        }
+        // Atomic write: write to temp file then rename to avoid corruption on crash
         let tmp_path = path.with_extension("json.tmp");
         fs::write(&tmp_path, &data).map_err(|source| ConfigError::Write {
             path: tmp_path.clone(),
             source,
-         })?;
+        })?;
         fs::rename(&tmp_path, path).map_err(|source| ConfigError::Write {
             path: path.to_path_buf(),
             source,
-         })
-     }
-
+        })
+    }
 
     pub fn openai_base_url(&self) -> Result<String, ConfigError> {
         if let Some(host) = non_empty(&self.ollama_ip) {
@@ -160,7 +159,10 @@ impl LauncherConfig {
         merge_option(&mut self.codex_command, &other.codex_command);
         merge_option(&mut self.codex_api_port, &other.codex_api_port);
         merge_option(&mut self.codex_api_scheme, &other.codex_api_scheme);
-        merge_option(&mut self.discover_ollama_models, &other.discover_ollama_models);
+        merge_option(
+            &mut self.discover_ollama_models,
+            &other.discover_ollama_models,
+        );
         merge_option(&mut self.codex_args, &other.codex_args);
         merge_option(&mut self.working_directory, &other.working_directory);
     }
@@ -269,39 +271,84 @@ fn ensure_v1(raw: String) -> String {
 fn expand_env_vars(value: &str) -> String {
     let mut expanded = value.to_string();
 
-     // Collect env vars to avoid borrowing std::env::vars mutably
+    // Collect env vars to avoid borrowing std::env::vars mutably
     let vars: Vec<(String, String)> = std::env::vars().collect();
 
     for (key, val) in &vars {
-         // Replace %KEY% with boundary awareness to avoid partial matches
+        // Replace %KEY% with boundary awareness to avoid partial matches
         let pattern = format!("%{}%", key);
         let mut result = String::new();
         let mut search_start = 0;
         let haystack = &expanded;
         while let Some(pos) = haystack[search_start..].find(&pattern) {
             let abs_pos = search_start + pos;
-            let before_ok = abs_pos == 0 || !haystack.chars().nth(abs_pos - 1).unwrap_or(' ').is_alphanumeric();
+            let before_ok = abs_pos == 0
+                || !haystack
+                    .chars()
+                    .nth(abs_pos - 1)
+                    .unwrap_or(' ')
+                    .is_alphanumeric();
             let after_pos = abs_pos + pattern.len();
-            let after_ok = after_pos >= haystack.len() || !haystack.chars().nth(after_pos).unwrap_or(' ').is_alphanumeric();
+            let after_ok = after_pos >= haystack.len()
+                || !haystack
+                    .chars()
+                    .nth(after_pos)
+                    .unwrap_or(' ')
+                    .is_alphanumeric();
             if before_ok && after_ok {
                 result.push_str(&haystack[search_start..abs_pos]);
-                result.push_str(&val);
+                result.push_str(val);
                 search_start = after_pos;
-             } else {
+            } else {
                 search_start = abs_pos + 1;
-             }
-          }
+            }
+        }
         if search_start == 0 {
             result = expanded.clone();
-          } else {
+        } else {
             result.push_str(&haystack[search_start..]);
-          }
+        }
         expanded = result;
 
-         // For ${KEY} and ${KEY} patterns, use exact non-overlapping replace
-        expanded = expanded.replacen(&format!("${{{key}}}"), &val, 1);
-        expanded = expanded.replacen(&format!("${key}"), &val, 1);
-     }
+        // For ${KEY} and ${KEY} patterns, use exact non-overlapping replace
+        expanded = expanded.replacen(&format!("${{{key}}}"), val, 1);
+        expanded = expanded.replacen(&format!("${key}"), val, 1);
+    }
 
     expanded
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LauncherConfig;
+    use serde_json::Value;
+    use std::collections::HashSet;
+
+    #[test]
+    fn config_example_matches_public_schema() {
+        let example = include_str!("../config.example.json").trim_start_matches('\u{feff}');
+        let parsed: LauncherConfig =
+            serde_json::from_str(example).expect("config.example.json should parse");
+        let json: Value =
+            serde_json::from_str(example).expect("config.example.json should be valid JSON");
+        let keys = json
+            .as_object()
+            .expect("config.example.json should be a JSON object")
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        assert!(
+            parsed.codex_api_port.is_some(),
+            "config.example.json should include codexApiPort"
+        );
+        assert!(
+            parsed.codex_api_scheme.is_some(),
+            "config.example.json should include codexApiScheme"
+        );
+        assert!(
+            keys.contains("openaiBaseUrl"),
+            "config.example.json should include openaiBaseUrl"
+        );
+    }
 }
