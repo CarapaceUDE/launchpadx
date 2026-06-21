@@ -16,6 +16,7 @@ export interface LauncherConfig {
     codexConfigPath?: string;
     codexCommand?: string;
     workingDirectory?: string;
+    codexApiKeyMode?: "envKey" | "experimentalBearerToken" | "none";
 }
 
 export interface HealthState {

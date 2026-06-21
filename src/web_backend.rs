@@ -19,6 +19,47 @@ pub struct RpcState {
 const ICON_FILENAME: &str = "icon.ico";
 const ICON_PNG: &str = "icon.png";
 const DIST_DIR: &str = "web/dist";
+const DIST_INDEX: &str = "web/dist/index.html";
+
+/// Locate the directory that contains `web/dist/index.html` at runtime.
+/// The GUI must not rely on compile-time `CARGO_MANIFEST_DIR` — the binary may
+/// be launched from `target/release/` or another checkout.
+pub fn resolve_gui_root() -> PathBuf {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        for _ in 0..6 {
+            if let Some(ref d) = dir {
+                candidates.push(d.clone());
+                dir = d.parent().map(|p| p.to_path_buf());
+            } else {
+                break;
+            }
+        }
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd);
+    }
+
+    candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
+
+    for root in candidates {
+        if root.join(DIST_INDEX).is_file() {
+            eprintln!("[GUI] Resolved app root: {}", root.display());
+            return root;
+        }
+    }
+
+    let fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    eprintln!(
+        "[GUI] Warning: {} not found; falling back to {}",
+        DIST_INDEX,
+        fallback.display()
+    );
+    fallback
+}
 
 fn resolve_icon_path(root: &Path) -> PathBuf {
     let candidates = [
@@ -152,7 +193,9 @@ pub fn launch_web_gui(root: PathBuf, config_path: PathBuf) -> Result<(), Box<dyn
             writeCodexConfig: function() { return this.call("writeCodexConfig", {}); },
             revertCodexConfig: function() { return this.call("revertCodexConfig", {}); },
             detectCodex: function() { return this.call("detectCodex", {}); },
-            killCodexByPid: function(pid) { return this.call("killCodexByPid", { pid }); }
+            killCodexByPid: function(pid) { return this.call("killCodexByPid", { pid }); },
+            openDirectoryPicker: function() { return this.call("openDirectoryPicker", {}); },
+            getAppLogs: function() { return this.call("getAppLogs", {}); }
           };
           "#.to_string(),
       );
@@ -197,6 +240,8 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
           "detectCodex" => rpc_detect_codex(state),
           "killCodexByPid" => rpc_kill_codex_by_pid(params),
           "toggleAutoStart" => rpc_toggle_auto_start(state),
+          "openDirectoryPicker" => rpc_open_directory_picker(),
+          "getAppLogs" => rpc_get_app_logs(state),
           _ => serde_json::json!({"error": format!("Unknown method: {}", method)}),
       }
 }
@@ -347,6 +392,37 @@ fn rpc_kill_codex_by_pid(params: serde_json::Value) -> serde_json::Value {
         Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
         Err(e) => serde_json::json!({"error": e.to_string()}),
       }
+}
+
+fn rpc_open_directory_picker() -> serde_json::Value {
+    match rfd::FileDialog::new().pick_folder() {
+        Some(path) => serde_json::json!({"path": path.to_string_lossy().to_string()}),
+        None => serde_json::json!({"path": ""}),
+    }
+}
+
+fn rpc_get_app_logs(state: &RpcState) -> serde_json::Value {
+    let logs_path = state.root.join("app.log");
+    let entries: Vec<serde_json::Value> = match std::fs::read_to_string(&logs_path) {
+        Ok(content) => content
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let (level, message) = if let Some(rest) = line.strip_prefix('[') {
+                    if let Some((lvl, msg)) = rest.split_once(']') {
+                        (lvl.trim().to_string(), msg.trim().to_string())
+                    } else {
+                        ("INFO".to_string(), line.to_string())
+                    }
+                } else {
+                    ("INFO".to_string(), line.to_string())
+                };
+                serde_json::json!({"level": level, "message": message})
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    serde_json::json!({"logs": entries})
 }
 
 fn rpc_toggle_auto_start(state: &RpcState) -> serde_json::Value {

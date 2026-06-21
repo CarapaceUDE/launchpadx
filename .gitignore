@@ -9,6 +9,12 @@ config.json
 # Rust build output
 /target/
 
+# Node modules
+node_modules/
+
+# Build output
+web/dist/
+
 # Temporary workspace data
 /.tmp/
 /tmp/

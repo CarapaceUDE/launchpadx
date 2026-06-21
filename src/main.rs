@@ -10,12 +10,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let manifest_path = PathBuf::from(manifest_dir);
-
     if std::env::args_os().any(|a| a == "--gui") {
-        let root = manifest_path.clone();
-        let config_path = manifest_path.join("config.json");
+        let root = codex_local_launcher::web_backend::resolve_gui_root();
+        let config_path = root.join("config.json");
         codex_local_launcher::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
      }
