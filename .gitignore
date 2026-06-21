@@ -19,6 +19,11 @@ web/dist/
 /.tmp/
 /tmp/
 
+# Local/session artifacts (not part of the app)
+agent-tools/
+codex-launchpad-src/
+mcps/
+
 # Logs and diagnostics
 *.log
 *.trace

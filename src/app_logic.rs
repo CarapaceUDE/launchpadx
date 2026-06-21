@@ -688,24 +688,13 @@ pub fn kill_codex_by_pid_number(pid: u32) -> Result<String, Box<dyn Error>> {
 }
 
 pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
-    let home_dir = dirs::home_dir().ok_or("Could not locate home directory; cannot determine Codex config path.")?;
-    let config_path = match config.codex_config_path() {
-        Some(p) => p,
-        None => home_dir.join(".codex").join("config.toml"),
-    };
+    let config_path = config
+        .codex_config_path()
+        .map(Ok)
+        .unwrap_or_else(codex_config::default_codex_config_path)?;
 
     if !config_path.exists() {
         return Ok("Codex config file does not exist; nothing to revert.".to_string());
-    }
-
-    // Verify the path is within expected directory to prevent path traversal
-    let canonical = match config_path.canonicalize() {
-        Ok(c) => c,
-        Err(e) => return Err(format!("Cannot resolve config path: {e}").into()),
-    };
-
-    if !canonical.starts_with(&home_dir) {
-        return Err("Config path is outside home directory; refusing to revert.".into());
     }
 
     let restored_path = codex_config::restore(config)?;
