@@ -216,7 +216,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, statusMessage: "Launching Codex..." }));
     try {
       await flushConfigSave();
-      const result = await window.codexRPC.launch();
+      const result = await window.codexRPC.launch(configRef.current);
       const payload = unwrap(result);
       const message = (payload as { message?: string }).message ?? "Codex launch requested.";
       setState((prev) => ({ ...prev, statusMessage: message }));

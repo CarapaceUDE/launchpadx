@@ -1,9 +1,15 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-if (-not (Test-Path (Join-Path $root "target\debug\codex-local-launcher.exe"))) {
-    Set-Location (Join-Path $root "..\codex-launchpad")
-    npm run build
-    Set-Location $root
-    cargo build --bin codex-local-launcher --manifest-path (Join-Path $root "Cargo.toml")
+. "$PSScriptRoot\lib.ps1"
+
+Set-Location $root
+$binary = Join-Path $root "target\debug\codex-local-launcher.exe"
+
+if (-not (Test-Path -LiteralPath $binary)) {
+    & (Get-CargoCommand) build --bin codex-local-launcher --manifest-path (Join-Path $root "Cargo.toml")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Rust build failed with exit code $LASTEXITCODE."
+    }
 }
 
+& $binary --gui @args

@@ -13,7 +13,8 @@ interface LogEntry {
 
 interface CodexIPC {
     call<T>(method: string, params?: Record<string, unknown>): Promise<LauncherResponse<T>>;
-    launch(): Promise<LauncherResponse<{ ok?: boolean; pid?: number; message?: string }>>;
+    launch(cfg?: LauncherConfig): Promise<LauncherResponse<{ ok?: boolean; pid?: number; message?: string }>>;
+    
     stop(): Promise<LauncherResponse<{ ok?: boolean; message?: string }>>;
     saveConfig(cfg: LauncherConfig): Promise<LauncherResponse<{ ok?: boolean; message?: string }>>;
     loadConfig(): Promise<LauncherResponse<LauncherConfig>>;

@@ -48,7 +48,7 @@ pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
 }
 
 pub fn restore(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
-    let restored_path = codex_config::restore(config)?;
+    let (restored_path, _) = codex_config::restore(config)?;
     Ok(format!(
         "Restored Codex config: {}",
         restored_path.display()
@@ -700,9 +700,14 @@ pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Er
         return Ok("Codex config file does not exist; nothing to revert.".to_string());
     }
 
-    let restored_path = codex_config::restore(config)?;
-    Ok(format!(
-        "Reverted Codex config to first backup: {}",
-        restored_path.display()
-    ))
+    let (restored_path, warning) = codex_config::restore(config)?;
+    let message = if let Some(w) = warning {
+        format!("Reverted Codex config -- {w}", w = w)
+    } else {
+        format!(
+            "Reverted Codex config to first backup: {}",
+            restored_path.display()
+        )
+    };
+    Ok(message)
 }

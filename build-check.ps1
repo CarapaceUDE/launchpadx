@@ -1,5 +1,8 @@
 # === Rust binary build check ===
+$ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
+. (Join-Path $root "scripts\lib.ps1")
+
 $binPath = Join-Path $root "target\release\codex-local-launcher.exe"
 $srcFiles = Get-ChildItem -Recurse -File (Join-Path $root "src") -ErrorAction SilentlyContinue
 $rustNeedsBuild = $false
@@ -19,7 +22,15 @@ if (-not (Test-Path $binPath)) {
 }
 
 if ($rustNeedsBuild) {
-    cargo build --release --bin codex-local-launcher
+    try {
+        $cargo = Get-CargoCommand
+    } catch {
+        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "Install Rust from https://rustup.rs/, then reopen this terminal and run the build again." -ForegroundColor Yellow
+        exit 1
+    }
+
+    & $cargo build --release --bin codex-local-launcher
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: Rust build failed!" -ForegroundColor Red
         exit 1

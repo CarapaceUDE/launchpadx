@@ -138,8 +138,8 @@ fn redact_sensitive_text(input: &str) -> String {
 
 fn redact_quoted_field(input: &str, field_name: &str) -> String {
     let patterns = [
-        format!("\"{field_name}\":"),
-        format!("\"{field_name}\" ="),
+        format!("\"{}\":", field_name),
+        format!("\"{}\" =", field_name),
         format!("{field_name}:"),
         format!("{field_name} ="),
     ];
@@ -346,7 +346,7 @@ pub fn launch_web_gui(
                     throw e;
                   });
               },
-            launch: function() { return this.call("launch", {}); },
+            launch: function(cfg) { return this.call("launch", cfg || {}); },
             stop: function() { return this.call("stop", {}); },
             saveConfig: function(cfg) { return this.call("saveConfig", cfg); },
             loadConfig: function() { return this.call("loadConfig", {}); },
@@ -392,7 +392,7 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
     match method {
         "loadConfig" => rpc_load_config(state),
         "saveConfig" => rpc_save_config(state, params),
-        "launch" => rpc_launch(state),
+        "launch" => rpc_launch(state, params),
         "stop" => rpc_stop(state),
         "healthCheck" => rpc_health_check(state, params),
         "listModels" => rpc_list_models(state),
@@ -458,10 +458,30 @@ fn rpc_save_config(state: &RpcState, params: serde_json::Value) -> serde_json::V
     }
 }
 
-fn rpc_launch(state: &RpcState) -> serde_json::Value {
-    let config = match LauncherConfig::read(&state.config_path) {
-        Ok(c) => c,
-        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+fn rpc_launch(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let incoming = serde_json::from_value::<LauncherConfig>(params).ok();
+    let has_overlay = incoming.as_ref().is_some_and(|cfg| {
+        cfg.ollama_ip.is_some()
+            || cfg.openai_base_url.is_some()
+            || cfg.ollama_port.is_some()
+            || cfg.ollama_scheme.is_some()
+            || cfg.codex_model.is_some()
+    });
+    let config = if has_overlay {
+        match LauncherConfig::read(&state.config_path) {
+            Ok(mut existing) => {
+                if let Some(ref incoming) = incoming {
+                    existing.merge_from(incoming);
+                }
+                existing
+            }
+            Err(_) => incoming.unwrap_or_default(),
+        }
+    } else {
+        match LauncherConfig::read(&state.config_path) {
+            Ok(c) => c,
+            Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+        }
     };
     if let Err(e) = app_logic::write_config(&config) {
         return serde_json::json!({"error": e.to_string()});

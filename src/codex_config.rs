@@ -45,6 +45,8 @@ pub enum CodexConfigError {
         path: PathBuf,
         source: serde_json::Error,
     },
+    #[error("restore state is missing; the revert could not restore your previous Codex model")]
+    RestoreStateMissing,
 }
 
 #[derive(Debug, Clone)]
@@ -91,8 +93,7 @@ pub fn apply(settings: &PersistentCodexConfig) -> Result<(), CodexConfigError> {
     apply_to_document(&mut document, settings);
     write_document(&settings.config_path, &document)
 }
-
-pub fn restore(config: &LauncherConfig) -> Result<PathBuf, CodexConfigError> {
+pub fn restore(config: &LauncherConfig) -> Result<(PathBuf, Option<String>), CodexConfigError> {
     let config_path = config
         .codex_config_path()
         .map(Ok)
@@ -104,7 +105,16 @@ pub fn restore(config: &LauncherConfig) -> Result<PathBuf, CodexConfigError> {
     restore_root_values(&mut document, &provider_id, restore_state.as_ref());
     remove_provider(&mut document, &provider_id);
     write_document(&config_path, &document)?;
-    Ok(config_path)
+
+    let warning = match restore_state {
+        Some(_) => None,
+        None => Some(
+            "Could not restore your previous Codex model -- the restore state file is missing."
+                .to_string(),
+        ),
+    };
+
+    Ok((config_path, warning))
 }
 
 fn read_document(path: &Path) -> Result<DocumentMut, CodexConfigError> {
@@ -222,7 +232,8 @@ fn restore_root_values(
             &state.model_catalog_json,
         );
     } else {
-        document.as_table_mut().remove("model_provider");
+        document.as_table_mut().remove("model");
+        document.as_table_mut().remove("model_catalog_json");
     }
 }
 

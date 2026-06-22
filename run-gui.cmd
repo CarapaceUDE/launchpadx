@@ -5,6 +5,11 @@ set ROOT=%~dp0
 
 :: Run conditional build script (Rust + Web UI)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%build-check.ps1"
+if errorlevel 1 (
+    echo Error: build failed. Check the output above.
+    pause
+    exit /b 1
+)
 
 :: Check binary exists (release)
 if not exist "%ROOT%target\release\codex-local-launcher.exe" (
@@ -13,5 +18,10 @@ if not exist "%ROOT%target\release\codex-local-launcher.exe" (
     exit /b 1
 )
 
-:: Launch the GUI
-start "" "%ROOT%target\release\codex-local-launcher.exe" --gui
+:: Keep the console attached so runtime errors remain visible.
+"%ROOT%target\release\codex-local-launcher.exe" --gui
+if errorlevel 1 (
+    echo Error: GUI exited unexpectedly. Check the output above.
+    pause
+    exit /b 1
+)
