@@ -44,7 +44,6 @@ interface LauncherContextValue extends LauncherState {
   revertCodexConfig: () => Promise<void>;
   refreshModels: () => Promise<void>;
   updateConfig: <K extends keyof LauncherConfig>(key: K, value: LauncherConfig[K]) => void;
-  openDirectoryPicker: () => Promise<string | null>;
   getAppLogs: () => Promise<LogEntry[]>;
 }
 
@@ -298,18 +297,6 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const openDirectoryPicker = useCallback(async () => {
-    try {
-      const result = await window.codexRPC.openDirectoryPicker();
-      const payload = unwrap(result);
-      return payload.path ?? null;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setState((prev) => ({ ...prev, statusMessage: msg }));
-      return null;
-    }
-  }, []);
-
   const getAppLogs = useCallback(async () => {
     try {
       const result = await window.codexRPC.getAppLogs();
@@ -328,7 +315,6 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     revertCodexConfig,
     refreshModels,
     updateConfig,
-    openDirectoryPicker,
     getAppLogs,
   };
 

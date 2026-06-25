@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SlidersHorizontal, FolderOpen, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
+import { SlidersHorizontal, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Card, FormField, TextInput, ToggleRow } from "./primitives";
 import type { CodexConfigForm } from "../../context/LauncherContext";
 
@@ -8,7 +8,6 @@ export function GeneralSettingsCard({
   onAutoStartChange,
   workingDir,
   onWorkingDirChange,
-  onBrowseDir,
   apiKey,
   onApiKeyChange,
   codexConfig,
@@ -18,7 +17,6 @@ export function GeneralSettingsCard({
   onAutoStartChange: (v: boolean) => void;
   workingDir: string;
   onWorkingDirChange: (v: string) => void;
-  onBrowseDir: () => void;
   apiKey: string;
   onApiKeyChange: (v: string) => void;
   codexConfig: CodexConfigForm;
@@ -40,29 +38,22 @@ export function GeneralSettingsCard({
           description="Launch the server when this app opens"
           checked={autoStart}
           onChange={onAutoStartChange}
+          testId="auto-start-toggle"
         />
 
-        <FormField label="Working Directory">
-          <div className="flex gap-2">
-            <TextInput
-              value={workingDir}
-              onChange={(e) => onWorkingDirChange(e.target.value)}
-              placeholder="~/projects"
-            />
-            <button
-              type="button"
-              onClick={onBrowseDir}
-              className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/70"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-              Browse
-            </button>
-          </div>
+        <FormField label="Working Directory" hint="Enter an absolute path to the project directory">
+          <TextInput
+            data-testid="working-directory"
+            value={workingDir}
+            onChange={(e) => onWorkingDirChange(e.target.value)}
+            placeholder="C:\projects\my-app"
+          />
         </FormField>
 
         <FormField label="API Key (optional)">
           <div className="relative">
             <TextInput
+              data-testid="api-key"
               type={showKey ? "text" : "password"}
               value={apiKey}
               onChange={(e) => onApiKeyChange(e.target.value)}

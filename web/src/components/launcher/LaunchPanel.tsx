@@ -43,6 +43,7 @@ export function LaunchPanel({
       </div>
 
       <button
+        data-testid="launch-toggle"
         onClick={onToggle}
         disabled={!running && !canStart}
         className={[
@@ -75,6 +76,7 @@ export function LaunchPanel({
           <div className="flex gap-2">
             <div className="relative flex-1">
               <select
+                data-testid="model-select"
                 value={selectedModel}
                 onChange={(e) => onSelectModel(e.target.value)}
                 disabled={empty}
@@ -100,6 +102,7 @@ export function LaunchPanel({
 
             <button
               type="button"
+              data-testid="refresh-models"
               onClick={onRefreshModels}
               disabled={refreshing}
               className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[13px] font-medium text-foreground hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-60"
@@ -128,7 +131,9 @@ export function LaunchPanel({
 
       <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3.5 py-2.5">
         <Info className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="text-[13px] text-muted-foreground">{statusStripText}</span>
+        <span className="text-[13px] text-muted-foreground" data-testid="status-strip">
+          {statusStripText}
+        </span>
       </div>
     </Card>
   );

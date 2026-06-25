@@ -31,7 +31,6 @@ export function LauncherPage() {
     revertCodexConfig,
     refreshModels,
     updateConfig,
-    openDirectoryPicker,
   } = useLauncher();
 
   const [activeNav, setActiveNav] = useState<NavKey>("launcher");
@@ -76,11 +75,6 @@ export function LauncherPage() {
     },
     [ip, port, scheme, updateConfig],
   );
-
-  const handleBrowseDir = useCallback(async () => {
-    const path = await openDirectoryPicker();
-    if (path) updateConfig("workingDirectory", path);
-  }, [openDirectoryPicker, updateConfig]);
 
   const handleViewDetails = useCallback(
     (name: string) => {
@@ -136,7 +130,7 @@ export function LauncherPage() {
         <div className="mx-auto max-w-[1100px] p-6">
           {activeNav === "launcher" ? (
             <div className="space-y-5">
-              <header className="mb-1">
+              <header className="mb-1" data-testid="page-launcher">
                 <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Launcher</h1>
                 <p className="text-[13px] text-muted-foreground">
                   Manage your local Codex server and model configuration.
@@ -180,7 +174,6 @@ export function LauncherPage() {
                   onAutoStartChange={(v) => updateConfig("autoStart", v)}
                   workingDir={workingDir}
                   onWorkingDirChange={(v) => updateConfig("workingDirectory", v)}
-                  onBrowseDir={handleBrowseDir}
                   apiKey={apiKey}
                   onApiKeyChange={(v) => updateConfig("apiKey", v)}
                   codexConfig={codexForm}

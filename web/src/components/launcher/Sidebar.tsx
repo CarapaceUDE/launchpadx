@@ -51,6 +51,7 @@ export function Sidebar({
             return (
               <li key={it.key}>
                 <button
+                  data-testid={`nav-${it.key}`}
                   onClick={() => onNavChange(it.key)}
                   className={[
                     "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
@@ -89,10 +90,13 @@ export function Sidebar({
               {running ? "Running" : "Stopped"}
             </span>
           </div>
-          <p className="mt-2 text-[12px] leading-snug text-white/70">{statusMessage}</p>
+          <p className="mt-2 text-[12px] leading-snug text-white/70" data-testid="sidebar-status">
+            {statusMessage}
+          </p>
         </div>
 
         <button
+          data-testid="sidebar-refresh-models"
           onClick={onRefresh}
           className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white/85 transition-colors hover:bg-white/10"
         >

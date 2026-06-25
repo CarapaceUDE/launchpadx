@@ -1,4 +1,4 @@
-use crate::app_logic;
+﻿use crate::app_logic;
 use crate::codex_process;
 use crate::config::LauncherConfig;
 use std::fs::OpenOptions;
@@ -32,7 +32,7 @@ macro_rules! gui_log {
 }
 
 /// Locate the directory that contains `web/dist/index.html` at runtime.
-/// The GUI must not rely on compile-time `CARGO_MANIFEST_DIR` — the binary may
+/// The GUI must not rely on compile-time `CARGO_MANIFEST_DIR` ΓÇö the binary may
 /// be launched from `target/release/` or another checkout.
 pub fn resolve_gui_root() -> PathBuf {
     let mut candidates: Vec<PathBuf> = Vec::new();
@@ -212,46 +212,21 @@ fn redact_token_after_marker(input: &str, marker: &str) -> String {
     result
 }
 
-pub fn launch_web_gui(
-    root: PathBuf,
-    config_path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    gui_log!(Some(root.as_path()), "INFO", "Starting web backend");
-    gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "Config: {}",
-        config_path.display()
-    );
-
+fn ensure_dist_dir(root: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let dist_dir = root.join(DIST_DIR);
     if !dist_dir.exists() {
         return Err("Web app not built. Run npm run build in the web/ directory.".into());
     }
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "Dist dir: {} (exists: {})",
-        dist_dir.display(),
-        dist_dir.exists()
-    );
+    Ok(dist_dir)
+}
 
-    let state = Arc::new(Mutex::new(RpcState {
-        config_path,
-        root: root.clone(),
-    }));
-
-    let (server, server_url) = start_server(&dist_dir, Arc::clone(&state))?;
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "HTTP server started on: {}",
-        server_url
-    );
-
-    let thread_root = root.clone();
-    let _server_handle = std::thread::spawn(move || {
+fn spawn_server_thread(
+    dist_dir: PathBuf,
+    state: Arc<Mutex<RpcState>>,
+    server: tiny_http::Server,
+    thread_root: PathBuf,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
         gui_log!(
             Some(thread_root.as_path()),
             "INFO",
@@ -269,7 +244,90 @@ pub fn launch_web_gui(
                 );
             }
         }
-    });
+    })
+}
+
+/// Headless HTTP server for Playwright and agent-driven E2E tests.
+pub fn serve_web_ui(
+    root: PathBuf,
+    config_path: PathBuf,
+    port: Option<u16>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    gui_log!(Some(root.as_path()), "INFO", "Starting headless web backend");
+    gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Config: {}",
+        config_path.display()
+    );
+
+    let dist_dir = ensure_dist_dir(&root)?;
+    let state = Arc::new(Mutex::new(RpcState {
+        config_path,
+        root: root.clone(),
+    }));
+
+    let (server, server_url) = start_server(port)?;
+    println!("CODEX_LAUNCHER_READY={server_url}");
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "HTTP server listening on {server_url}"
+    );
+
+    for request in server.incoming_requests() {
+        if let Err(_e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            handle_request(&dist_dir, &state, request);
+        })) {
+            gui_log!(
+                Some(root.as_path()),
+                "ERROR",
+                "RPC handler panicked: {:?}",
+                _e
+            );
+        }
+    }
+
+    Ok(())
+}
+
+pub fn launch_web_gui(
+    root: PathBuf,
+    config_path: PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    gui_log!(Some(root.as_path()), "INFO", "Starting web backend");
+    gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Config: {}",
+        config_path.display()
+    );
+
+    let dist_dir = ensure_dist_dir(&root)?;
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Dist dir: {} (exists: {})",
+        dist_dir.display(),
+        dist_dir.exists()
+    );
+
+    let state = Arc::new(Mutex::new(RpcState {
+        config_path,
+        root: root.clone(),
+    }));
+
+    let (server, server_url) = start_server(None)?;
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "HTTP server started on: {}",
+        server_url
+    );
+
+    let _server_handle = spawn_server_thread(dist_dir, Arc::clone(&state), server, root.clone());
 
     gui_log!(Some(root.as_path()), "INFO", "Server thread spawned");
     gui_log!(Some(root.as_path()), "INFO", "Creating event loop");
@@ -328,40 +386,8 @@ pub fn launch_web_gui(
           };
         window.addEventListener("unhandledrejection", function(e) {
             console.error("Unhandled rejection:", e.reason);
-          });
-        window.codexRPC = {
-            call: function(method, params) {
-                return fetch("/rpc", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ method: method, params: params || {} })
-                  })
-                  .then(function(r) { return r.json(); })
-                  .then(function(result) {
-                    if (result.error) throw new Error(result.error);
-                    return result;
-                  })
-                  .catch(function(e) {
-                    console.error("RPC call to " + method + " failed:", e);
-                    throw e;
-                  });
-              },
-            launch: function(cfg) { return this.call("launch", cfg || {}); },
-            stop: function() { return this.call("stop", {}); },
-            saveConfig: function(cfg) { return this.call("saveConfig", cfg); },
-            loadConfig: function() { return this.call("loadConfig", {}); },
-            healthCheck: function(cfg) { return this.call("healthCheck", cfg || {}); },
-            listModels: function() { return this.call("listModels", {}); },
-            refreshModels: function(cfg) { return this.call("refreshModels", cfg || {}); },
-            writeCodexConfig: function() { return this.call("writeCodexConfig", {}); },
-            revertCodexConfig: function() { return this.call("revertCodexConfig", {}); },
-            detectCodex: function() { return this.call("detectCodex", {}); },
-            killCodexByPid: function(pid) { return this.call("killCodexByPid", { pid }); },
-            openDirectoryPicker: function() { return this.call("openDirectoryPicker", {}); },
-            getAppLogs: function() { return this.call("getAppLogs", {}); }
-          };
-          "#
-        .to_string(),
+          });"#
+            .to_string(),
     );
 
     let _webview = WebView::new(&window, attrs)?;
@@ -377,10 +403,12 @@ pub fn launch_web_gui(
 }
 
 fn start_server(
-    _dist_dir: &Path,
-    _state: Arc<Mutex<RpcState>>,
+    port: Option<u16>,
 ) -> Result<(tiny_http::Server, String), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let listener = match port {
+        Some(port) => TcpListener::bind(format!("127.0.0.1:{port}"))?,
+        None => TcpListener::bind("127.0.0.1:0")?,
+    };
     let port = listener.local_addr()?.port();
     let server = tiny_http::Server::from_listener(listener, None)
         .map_err(|e| Box::new(std::io::Error::other(e)))?;

@@ -25,7 +25,7 @@ interface CodexIPC {
     revertCodexConfig(): Promise<LauncherResponse<{ message?: string }>>;
     detectCodex(): Promise<LauncherResponse<CodexProcessInfo>>;
     killCodexByPid(pid: number): Promise<LauncherResponse<{ message?: string }>>;
-    openDirectoryPicker(): Promise<LauncherResponse<{ path: string }>>;
+
     getAppLogs(): Promise<LauncherResponse<{ logs: LogEntry[] }>>;
     saveSettings(settings: Record<string, unknown>): Promise<LauncherResponse<{ message?: string }>>;
     toggleAutoStart(): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;

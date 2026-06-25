@@ -1,18 +1,29 @@
 use std::path::{Path, PathBuf};
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if let Err(err) = run().await {
+fn main() {
+    if let Err(err) = dispatch() {
         eprintln!("codex-local-launcher: {err}");
         std::process::exit(1);
     }
-    Ok(())
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::args_os().any(|a| a == "--gui") {
+fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
+    if args.serve_only {
         let root = codex_local_launcher::web_backend::resolve_gui_root();
-        let config_path = root.join("config.json");
+        let config_path = args
+            .config_path
+            .unwrap_or_else(|| default_config_path(&root));
+        codex_local_launcher::web_backend::serve_web_ui(root, config_path, args.port)?;
+        return Ok(());
+    }
+
+    if args.gui {
+        let root = codex_local_launcher::web_backend::resolve_gui_root();
+        let config_path = args
+            .config_path
+            .unwrap_or_else(|| root.join("config.json"));
         codex_local_launcher::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
     }
@@ -22,7 +33,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let args = Args::parse();
+    if args.needs_async() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        return runtime.block_on(run_cli_async(args));
+    }
+
+    run_cli_sync(args)
+}
+
+fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let root = std::env::current_exe()
         .ok()
         .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
@@ -80,6 +101,44 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if args.kill {
+        match codex_local_launcher::app_logic::kill_codex_by_pid(&pid_file) {
+            Ok(msg) => {
+                println!("{}", msg);
+            }
+            Err(e) => {
+                eprintln!("Failed to kill Codex: {e}");
+                std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+
+    // Default: launch Codex
+    println!(
+        "{}",
+        codex_local_launcher::app_logic::write_config(&config)?
+    );
+    println!(
+        "{}",
+        codex_local_launcher::app_logic::launch(&config, &root, &pid_file)?
+    );
+    Ok(())
+}
+
+async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
+    let root = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
+        .unwrap_or(std::env::current_dir()?);
+
+    let config_path = args
+        .config_path
+        .unwrap_or_else(|| default_config_path(&root));
+
+    let config = codex_local_launcher::config::LauncherConfig::read(&config_path)?;
+    let pid_file = codex_local_launcher::app_logic::codex_pid_file(&config_path);
+
     if args.launch_wait {
         println!(
             "{}",
@@ -92,19 +151,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             println!("Codex launched and API is ready!");
         } else {
             println!("Codex launched (API may need more time)");
-        }
-        return Ok(());
-    }
-
-    if args.kill {
-        match codex_local_launcher::app_logic::kill_codex_by_pid(&pid_file) {
-            Ok(msg) => {
-                println!("{}", msg);
-            }
-            Err(e) => {
-                eprintln!("Failed to kill Codex: {e}");
-                std::process::exit(1);
-            }
         }
         return Ok(());
     }
@@ -136,7 +182,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(session_id) = &args.session_response {
-        let response = codex_local_launcher::app_logic::get_response(&config, session_id).await?;
+        let response =
+            codex_local_launcher::app_logic::get_response(&config, session_id).await?;
         println!("{}", response.content);
         return Ok(());
     }
@@ -157,15 +204,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // Default: launch Codex
-    println!(
-        "{}",
-        codex_local_launcher::app_logic::write_config(&config)?
-    );
-    println!(
-        "{}",
-        codex_local_launcher::app_logic::launch(&config, &root, &pid_file)?
-    );
     Ok(())
 }
 
@@ -186,6 +224,8 @@ fn print_help() {
     println!();
     println!("OPTIONS:");
     println!("         --gui                      Open the GUI");
+    println!("         --serve-only               Serve web UI over HTTP (no native window)");
+    println!("         --port <port>              Port for --serve-only (default: random)");
     println!("         --config <path>           Path to config.json (default: auto-detect)");
     println!("         --write-config-only       Write Codex config but do not launch");
     println!("         --restore                 Restore previous Codex settings");
@@ -218,6 +258,8 @@ fn print_models(cache: &codex_local_launcher::ollama::ModelCache) {
 struct Args {
     config_path: Option<PathBuf>,
     gui: bool,
+    serve_only: bool,
+    port: Option<u16>,
     write_config_only: bool,
     restore: bool,
     refresh_models: bool,
@@ -249,6 +291,12 @@ impl Args {
             } else if arg == "--gui" {
                 parsed.gui = true;
                 i += 1;
+            } else if arg == "--serve-only" {
+                parsed.serve_only = true;
+                i += 1;
+            } else if arg == "--port" {
+                parsed.port = raw_args.get(i + 1).and_then(|p| p.parse().ok());
+                i += 2;
             } else if arg == "--write-config-only" {
                 parsed.write_config_only = true;
                 i += 1;
@@ -312,6 +360,16 @@ impl Args {
         }
         parsed
     }
+
+    fn needs_async(&self) -> bool {
+        self.launch_wait
+            || self.health
+            || self.session_create.is_some()
+            || self.session_send.is_some()
+            || self.session_response.is_some()
+            || self.session_close.is_some()
+            || self.session_list
+    }
 }
 
 #[cfg(test)]
@@ -322,6 +380,8 @@ mod tests {
     fn default_args_are_empty() {
         let args = Args::default();
         assert!(!args.gui);
+        assert!(!args.serve_only);
+        assert!(args.port.is_none());
         assert!(!args.write_config_only);
         assert!(!args.restore);
         assert!(!args.refresh_models);
@@ -335,5 +395,13 @@ mod tests {
         assert!(args.session_response.is_none());
         assert!(args.session_close.is_none());
         assert!(!args.session_list);
+        assert!(!args.needs_async());
+    }
+
+    #[test]
+    fn health_flag_needs_async() {
+        let mut args = Args::default();
+        args.health = true;
+        assert!(args.needs_async());
     }
 }

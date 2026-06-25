@@ -23,6 +23,7 @@ export function EndpointCard({
       <div className="grid grid-cols-2 gap-x-4 gap-y-[14px]">
         <FormField label="IP Address">
           <TextInput
+            data-testid="endpoint-ip"
             value={ip}
             onChange={(e) => onChange({ ip: e.target.value })}
             placeholder="127.0.0.1"
@@ -30,6 +31,7 @@ export function EndpointCard({
         </FormField>
         <FormField label="Port">
           <TextInput
+            data-testid="endpoint-port"
             value={port}
             onChange={(e) => onChange({ port: e.target.value })}
             placeholder="11434"
@@ -38,6 +40,7 @@ export function EndpointCard({
         <FormField label="Scheme">
           <div className="relative">
             <select
+              data-testid="endpoint-scheme"
               value={scheme}
               onChange={(e) => onChange({ scheme: e.target.value as "http" | "https" })}
               className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
@@ -50,6 +53,7 @@ export function EndpointCard({
         </FormField>
         <FormField label="Base URL" hint="Generated from IP, port, and scheme">
           <TextInput
+            data-testid="endpoint-base-url"
             value={baseUrl}
             readOnly
             className="cursor-not-allowed bg-muted/50 font-mono text-[13px] text-muted-foreground"
@@ -59,6 +63,7 @@ export function EndpointCard({
 
       <button
         type="button"
+        data-testid="refresh-endpoint-models"
         onClick={onRefresh}
         disabled={refreshing}
         className="mt-4 inline-flex h-[38px] w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-60"

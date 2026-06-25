@@ -21,6 +21,7 @@ export function CodexProfileBar({
     <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
+          data-testid="revert-codex-profile"
           onClick={() => setConfirmRevert(true)}
           className="inline-flex h-[40px] items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-muted/70"
         >
@@ -28,6 +29,7 @@ export function CodexProfileBar({
           Revert to Codex Profile
         </button>
         <button
+          data-testid="write-codex-config"
           onClick={onWrite}
           disabled={!canWrite}
           className="inline-flex h-[40px] items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:border-border disabled:bg-border/40 disabled:text-muted-foreground"
@@ -39,6 +41,7 @@ export function CodexProfileBar({
 
       {confirmRevert && (
         <div
+          data-testid="revert-confirm-dialog"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
           onClick={() => setConfirmRevert(false)}
         >
@@ -65,6 +68,7 @@ export function CodexProfileBar({
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
+                data-testid="revert-cancel"
                 onClick={() => setConfirmRevert(false)}
                 className="inline-flex h-[36px] items-center rounded-md border border-input bg-background px-4 text-[13px] font-semibold text-foreground transition-colors hover:bg-muted/70"
               >
@@ -72,6 +76,7 @@ export function CodexProfileBar({
               </button>
               <button
                 type="button"
+                data-testid="revert-confirm"
                 onClick={handleConfirmRevert}
                 className="inline-flex h-[36px] items-center rounded-md bg-[color:var(--color-warning-fg)] px-4 text-[13px] font-semibold text-white transition-colors hover:opacity-90"
               >

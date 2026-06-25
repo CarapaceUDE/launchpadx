@@ -15,6 +15,11 @@ node_modules/
 # Build output
 web/dist/
 
+# Playwright artifacts
+web/playwright-report/
+web/test-results/
+web/blob-report/
+
 # Temporary workspace data
 /.tmp/
 /tmp/
