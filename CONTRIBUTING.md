@@ -9,28 +9,28 @@ Thanks for your interest in contributing! This project is a small Rust tool, and
 ### Prerequisites
 
 - [Rust toolchain](https://rustup.rs/) (latest stable)
-- PowerShell 5+ (for build/launch scripts on Windows)
+- [Node.js](https://nodejs.org/) 18+ (web UI)
+- Platform GUI deps if building the desktop app — see [README prerequisites](README.md#prerequisites)
 
 ### Building
 
-```powershell
-.\build.cmd
-```
-
-Or directly:
-
-```powershell
+```sh
+cd web && npm ci && npm run build
 cargo build --bins
 ```
 
+PowerShell wrappers (`build.cmd`, `run-gui.cmd`, etc.) are **Windows-only conveniences**. On macOS or Linux, use `cargo` and `npm` directly.
+
 ### Running
 
-| Script | Purpose |
+| Command | Purpose |
 |---|---|
-| `.\run-gui.cmd` | Launch the desktop UI |
-| `.\launch-codex.cmd` | Write config and launch Codex |
-| `.\test.cmd` | Run `cargo fmt --check`, `cargo test`, `cargo clippy` |
+| `codex-launchpad --gui` | Launch the desktop UI |
+| `codex-launchpad --launch` | Write config and launch Codex |
+| `cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings` | Pre-commit checks |
 | `cd web && npm run screenshot:readme` | Regenerate `assets/readme-screenshot.png` for the README |
+
+On Windows you can use `.\run-gui.cmd`, `.\test.cmd`, and the scripts in `scripts/` instead.
 
 ### CLI Options
 
@@ -47,7 +47,7 @@ codex-launchpad --restore
 1. **Fork and clone** this repo.
 2. **Create a feature branch**: `git checkout -b feature/my-change`
 3. **Make your changes** — keep them focused and small.
-4. **Run checks** before committing: `.\test.cmd`
+4. **Run checks** before committing (see [Testing](README.md#testing) in the README)
 5. **Commit** with a descriptive message (conventional commits preferred but not required).
 6. **Open a pull request** with a clear description of what changes and why.
 
@@ -74,7 +74,7 @@ src/
     windows.rs     # Windows: PATH search + Store AppID
     macos.rs       # macOS: .app bundle search
     linux.rs       # Linux: PATH + AppImage search
-scripts/           # PowerShell helper scripts
+scripts/           # Windows PowerShell helpers (optional)
 ```
 
 ## Reporting Issues

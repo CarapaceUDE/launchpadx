@@ -55,37 +55,49 @@
 
 **Why Patreon for official builds?** Carapace is early-stage and needs supporter revenue to keep building. The source is fully open under MIT, so anyone can compile and run the app for free. Official pre-built binaries are a convenience for [Patreon supporters](https://carapaceai.org/patreon) while we grow.
 
-During this phase, that split is intentional. Building from source naturally filters for people comfortable debugging setup — the kind of early users who file useful issues and contribute fixes. We'd rather work with that crowd while things are still rough than field a wave of "it just broke" reports from folks who expected a polished download-and-go experience. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
+During this phase, that split is intentional—it doubles as an early-access filter. While things are still rough, we'd rather surface bugs through people who build from source and are comfortable debugging setup: developer-minded early testers who file useful issues and contribute fixes. That keeps us learning from actionable feedback instead of drowning in "it just broke" reports from users who downloaded a binary and expected polish on day one. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
 
 ---
 
 ## Prerequisites
 
-- **Rust / Cargo** � `rustc` 1.75+ (install via [rustup](https://rustup.rs/))
+- **Rust / Cargo** — `rustc` 1.75+ (install via [rustup](https://rustup.rs/))
 - **Node.js** 18+ (for the web UI)
-- **Windows 10+** (tested on Windows; other platforms may work for the CLI)
-- **Codex CLI or Desktop App** � installed and discoverable on PATH (or set `codexCommand` in config)
+- **Codex CLI or Desktop App** — installed and discoverable on PATH (or set `codexCommand` in config)
 - An **OpenAI-compatible API** reachable from your machine (local server, LAN host, or remote gateway)
+
+**GUI builds** also need native webview dependencies (wry/tao):
+
+| Platform | Packages / tools |
+| -------- | ---------------- |
+| **Linux** | GTK 3 + WebKitGTK — e.g. on Debian/Ubuntu: `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev pkg-config` |
+| **macOS** | Xcode Command Line Tools (`xcode-select --install`) |
+| **Windows** | WebView2 (usually preinstalled on Windows 10/11) |
+
+The project targets **Windows, macOS, and Linux**. You can build on any of them for the host OS. Cross-compiling for another OS is supported via `rustup target add` + `cargo build --target <triple>` (see [Build system](#build-system)).
 
 ## Quick Start (GUI)
 
 **Official builds:** download the latest binary from [Patreon](https://carapaceai.org/patreon).
 
-**From source:** build and run locally:
+**From source:** build and run locally (works on any supported OS):
 
 1. **Copy and edit the config:**
-   ```powershell
-   Copy-Item config.example.json config.json
+   ```sh
+   cp config.example.json config.json
    # Edit config.json with your API host, port, and key
-   notepad config.json
    ```
 
-2. **Run the launcher:**
-   ```powershell
-   .\run-gui.cmd
+2. **Build and launch the GUI:**
+   ```sh
+   cd web && npm ci && npm run build && cd ..
+   cargo build --release
+   ./target/release/codex-launchpad --gui
    ```
 
-   This script runs a build check first (Rust + web UI) and launches `target\release\codex-launchpad.exe --gui`.
+   On Windows the binary is `target\release\codex-launchpad.exe`. If `web/dist/` is missing, `cargo build` will try to run `npm run build` for you via `build.rs`.
+
+   **Windows shortcut:** `.\run-gui.cmd` runs a stale-build check and launches the release GUI — convenience only, not required.
 
 3. **Use the UI:**
    - **Launch tab** � select a model, launch Codex.
@@ -96,50 +108,37 @@ During this phase, that split is intentional. Building from source naturally fil
 
 ## CLI Usage (headless / automation)
 
-You can also operate the launcher entirely from the command line.
+You can also operate the launcher entirely from the command line on any platform.
 
 ### Building & Running
 
-```powershell
+```sh
 # Build everything (Rust + web UI)
-.\build.cmd
-
-# Or the release binary directly
+cd web && npm ci && npm run build && cd ..
 cargo build --release
 
-# Run the CLI
-.\scripts\run-cli.ps1 --config config.json
+# Run the CLI (same binary as the GUI)
+./target/release/codex-launchpad --config config.json
 ```
 
-The CLI binary is `target\debug\codex-launchpad.exe` (debug) or `target\release\codex-launchpad.exe` (release).
+The binary lives at `target/debug/codex-launchpad` (debug) or `target/release/codex-launchpad` (release). Add `.exe` on Windows.
 
-### Refreshing Models
+### Common CLI commands
 
-```powershell
-# Discover and cache models from your configured API
-.\scripts\refresh-models.ps1
-
-# Or with a specific config
-.\scripts\run-cli.ps1 --config config.json --refresh-models
+```sh
+codex-launchpad --refresh-models          # discover and cache models
+codex-launchpad --list-models             # print cached models
+codex-launchpad --write-config-only       # write ~/.codex/config.toml only
+codex-launchpad --launch                  # apply config and launch Codex
+codex-launchpad --restore                 # restore previous Codex settings
+codex-launchpad --help                    # full flag list
 ```
 
-### Launching Codex from CLI
+Pass `--config path/to/config.json` when not running from the repo root.
 
-```powershell
-.\launch-codex.cmd
-# or
-.\scripts\launch-codex.ps1
-```
+### Windows helper scripts (optional)
 
-These scripts read `config.json`, set `OPENAI_BASE_URL` and `OPENAI_API_KEY` environment variables, then launch Codex. They auto-detect the Codex executable (including Microsoft Store packaged apps).
-
-### Restoring Previous Config
-
-The launcher backs up the previous Codex root model/provider before applying its own. Restore it via:
-
-```powershell
-.\scripts\restore.ps1
-```
+PowerShell wrappers in `scripts/` mirror the CLI flags above (`run-cli.ps1`, `refresh-models.ps1`, `restore.ps1`, `launch-codex.ps1`). They are **Windows-only conveniences** — the `codex-launchpad` binary is the portable interface.
 
 ## Config
 
@@ -170,51 +169,61 @@ Local settings live in `config.json` (gitignored). Public defaults are in `confi
 
 ## Build System
 
-### `build.cmd` � Full Build
+### Universal build (any OS)
 
-Runs a conditional build script (`scripts\build.ps1`) that invokes `cargo build --bins`. This compiles the Rust binaries (GUI and CLI).
+```sh
+# Web UI
+cd web && npm ci && npm run build
 
-### `build-check.ps1` � Smart Build Check
+# Rust binary (GUI + CLI share one executable)
+cargo build --release
+```
 
-Used by `run-gui.cmd`. Checks whether the release binary or web UI bundle is stale and rebuilds only what's needed:
-- Compares source file timestamps against the existing binary and web bundle.
-- Builds Rust if any `.rs` source is newer than `target\release\codex-launchpad.exe`.
-- Runs `npm run build` in `web/` if any web source is newer than `web\dist\assets\index.js`.
-- Stages the web build output and `config.json` next to the release binary.
+`build.rs` runs `npm run build` automatically during `cargo build` if `web/dist/index.html` is missing.
 
-### `run-gui.cmd` � Launch GUI
+### Cross-compilation
 
-1. Runs `build-check.ps1` to ensure everything is built.
-2. Launches `target\release\codex-launchpad.exe --gui`.
+Install a target triple, then build for it:
 
-### `build.rs` � Cargo Build Script
+```sh
+rustup target add aarch64-unknown-linux-gnu   # example
+cargo build --release --target aarch64-unknown-linux-gnu
+```
 
-Runs `npm run build` automatically during `cargo build` if `web/dist/index.html` is missing. Ensures the web UI is always present alongside the binary.
+Output: `target/<triple>/release/codex-launchpad`. You need the appropriate linker and sysroot for the destination OS. The [Build Official Binaries](.github/workflows/build-official-binaries.yml) workflow shows the target triples we ship (Windows, macOS x86_64/arm64, Linux x86_64/arm64).
+
+### Windows-only convenience scripts
+
+These wrap the same `cargo` / `npm` steps for local Windows development — they are not required on macOS or Linux:
+
+| Script | Purpose |
+| ------ | ------- |
+| `build.cmd` / `scripts/build.ps1` | `cargo build --bins` |
+| `build-check.ps1` | Timestamp-based incremental rebuild (used by `run-gui.cmd`) |
+| `run-gui.cmd` | Build if stale, then `codex-launchpad --gui` |
+| `test.cmd` | `cargo fmt --check`, `cargo test`, `cargo clippy` |
+| `diagnose.ps1` | Health-check RPC, API connectivity, model discovery |
 
 ## Testing
 
 The **CI** badge runs [GitHub Actions](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml) on every push to `master`: it checks Rust formatting, runs Clippy lints, and executes unit tests. It does not build release binaries (those are distributed via [Patreon](https://carapaceai.org/patreon) for now).
 
-```powershell
-# Format check, unit tests, and clippy
-.\test.cmd
-```
-
-This runs the same checks locally:
-```powershell
+```sh
 cargo fmt -- --check
 cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
+On Windows, `.\test.cmd` runs the same three commands.
+
 ## Diagnostics
 
-```powershell
-# Health-check diagnostic script
-.\diagnose.ps1
+```sh
+codex-launchpad --health
+codex-launchpad --list-models
 ```
 
-Tests launcher RPC, API connectivity, and model list discovery. Helpful for troubleshooting endpoint issues.
+On Windows, `.\diagnose.ps1` runs a fuller connectivity check (launcher RPC, API reachability, model discovery).
 
 ## Security
 
@@ -242,22 +251,22 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 �   +-- src/              # React components & pages
 �   +-- dist/             # Built output (gitignored)
 �   +-- package.json      # Frontend deps
-+-- scripts/              # PowerShell scripts
++-- scripts/              # Windows PowerShell helpers (optional)
 �   +-- lib.ps1           # Shared helpers (Get-CargoCommand)
 �   +-- run-gui.ps1       # GUI run script
 �   +-- run-cli.ps1       # CLI run script
 �   +-- refresh-models.ps1
 �   +-- restore.ps1
 �   +-- build.ps1
-+-- build-check.ps1       # Smart build checker (used by run-gui.cmd)
++-- build-check.ps1       # Windows incremental build checker
 +-- build.rs              # Cargo build script (auto-builds web UI)
-+-- launch-codex.ps1      # Standalone Codex launcher
-+-- diagnose.ps1          # Health check diagnostic
++-- launch-codex.ps1      # Windows Codex launcher wrapper
++-- diagnose.ps1          # Windows health-check diagnostic
 +-- config.example.json   # Public config template
 +-- config.json           # Local config (gitignored)
-+-- run-gui.cmd           # Windows launcher for the GUI
-+-- build.cmd             # Windows launcher for cargo build
-+-- test.cmd              # Windows launcher for cargo test
++-- run-gui.cmd           # Windows: build + launch GUI
++-- build.cmd             # Windows: cargo build wrapper
++-- test.cmd              # Windows: fmt + test + clippy wrapper
 +-- docs/
     +-- architecture.md   # Architecture notes
 ```

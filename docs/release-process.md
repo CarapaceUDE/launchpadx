@@ -19,7 +19,7 @@ Official binaries are **not** attached to public GitHub Releases. See [OFFICIAL_
 ## Day-to-day change flow
 
 1. Branch from `master`
-2. Implement + run `.\test.cmd` (and `cd web && npm run build` if UI changed)
+2. Implement + run the [testing checks](../README.md#testing) (and `cd web && npm run build` if UI changed)
 3. Open PR → wait for CI green → squash merge
 4. Update `CHANGELOG.md` for user-visible changes
 
