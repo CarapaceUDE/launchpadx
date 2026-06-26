@@ -81,7 +81,9 @@ pub fn launch_path(
     Ok(())
 }
 
-pub fn launch_windows_start_app(app_id: &str) -> Result<(), LauncherError> {
+pub fn launch_windows_start_app(
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] app_id: &str,
+) -> Result<(), LauncherError> {
     #[cfg(target_os = "windows")]
     {
         return windows::launch_start_app(app_id);

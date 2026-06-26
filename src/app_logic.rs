@@ -654,15 +654,17 @@ fn detect_process_on_port(port: u16) -> Option<(u32, String)> {
             None
         };
 
-        if let Some(pid_str) = stdout.and_then(|s| s.trim().lines().next()) {
-            if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                // Verify process still exists
-                let verify = Command::new("kill")
-                    .args(["-0", &pid.to_string()])
-                    .output()
-                    .ok()?;
-                if verify.status.success() {
-                    return Some((pid, "lsof".to_string()));
+        if let Some(ref output) = stdout {
+            if let Some(line) = output.lines().map(str::trim).find(|line| !line.is_empty()) {
+                if let Ok(pid) = line.parse::<u32>() {
+                    // Verify process still exists
+                    let verify = Command::new("kill")
+                        .args(["-0", &pid.to_string()])
+                        .output()
+                        .ok()?;
+                    if verify.status.success() {
+                        return Some((pid, "lsof".to_string()));
+                    }
                 }
             }
         }
