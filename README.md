@@ -53,7 +53,9 @@
 | **Official binaries** | [Official build terms](OFFICIAL_BUILDS.md) — personal use, no redistribution | [Patreon supporters](https://carapaceai.org/patreon) |
 | **Self-built binary** | MIT (you compiled from source) | [Build instructions](#quick-start-gui) below |
 
-**Why Patreon for official builds?** Carapace is early-stage and needs supporter revenue to keep building. The source is fully open under MIT, so anyone can compile and run the app for free. Official pre-built binaries are a convenience for [Patreon supporters](https://carapaceai.org/patreon) while we grow. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
+**Why Patreon for official builds?** Carapace is early-stage and needs supporter revenue to keep building. The source is fully open under MIT, so anyone can compile and run the app for free. Official pre-built binaries are a convenience for [Patreon supporters](https://carapaceai.org/patreon) while we grow.
+
+During this phase, that split is intentional. Building from source naturally filters for people comfortable debugging setup — the kind of early users who file useful issues and contribute fixes. We'd rather work with that crowd while things are still rough than field a wave of "it just broke" reports from folks who expected a polished download-and-go experience. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
 
 ---
 
