@@ -522,10 +522,8 @@ name = "Local Ollama"
 
     #[test]
     fn apply_and_restore_round_trip() {
-        let dir = std::env::temp_dir().join(format!(
-            "codex-launcher-roundtrip-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("codex-launcher-roundtrip-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let path = dir.join("config.toml");
@@ -538,12 +536,14 @@ model_provider = "openai"
         )
         .expect("seed config");
 
-        let mut launcher = LauncherConfig::default();
-        launcher.codex_config_path = Some(path.to_string_lossy().to_string());
-        launcher.codex_provider_id = Some("codex-launchpad".to_string());
-        launcher.codex_provider_name = Some("Codex Launcher".to_string());
-        launcher.codex_model = Some("llama3.2".to_string());
-        launcher.api_key = Some("test-key".to_string());
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            codex_provider_name: Some("Codex Launcher".to_string()),
+            codex_model: Some("llama3.2".to_string()),
+            api_key: Some("test-key".to_string()),
+            ..LauncherConfig::default()
+        };
 
         let settings = PersistentCodexConfig {
             config_path: path.clone(),
@@ -566,7 +566,10 @@ model_provider = "openai"
 
         let document = read_document(&path).expect("read restored");
         assert_eq!(root_string(&document, "model").as_deref(), Some("gpt-test"));
-        assert_eq!(root_string(&document, "model_provider").as_deref(), Some("openai"));
+        assert_eq!(
+            root_string(&document, "model_provider").as_deref(),
+            Some("openai")
+        );
         assert!(!document.to_string().contains("codex-launchpad"));
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -584,9 +587,11 @@ base_url = "http://127.0.0.1:11434/v1"
 "#;
         std::fs::write(&path, text).expect("write temp config");
 
-        let mut launcher = LauncherConfig::default();
-        launcher.codex_config_path = Some(path.to_string_lossy().to_string());
-        launcher.codex_provider_id = Some("codex-launchpad".to_string());
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            ..LauncherConfig::default()
+        };
 
         let inspection = inspect(&launcher).expect("inspect");
         assert!(inspection.exists);

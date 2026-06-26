@@ -21,9 +21,7 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.gui {
         let root = codex_launchpad::web_backend::resolve_gui_root();
-        let config_path = args
-            .config_path
-            .unwrap_or_else(|| root.join("config.json"));
+        let config_path = args.config_path.unwrap_or_else(|| root.join("config.json"));
         codex_launchpad::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
     }
@@ -82,10 +80,7 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if args.write_config_only {
-        println!(
-            "{}",
-            codex_launchpad::app_logic::write_config(&config)?
-        );
+        println!("{}", codex_launchpad::app_logic::write_config(&config)?);
         return Ok(());
     }
 
@@ -172,15 +167,13 @@ async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some((session_id, msg)) = &args.session_send {
-        let response =
-            codex_launchpad::app_logic::send_message(&config, session_id, msg).await?;
+        let response = codex_launchpad::app_logic::send_message(&config, session_id, msg).await?;
         println!("{}", response.content);
         return Ok(());
     }
 
     if let Some(session_id) = &args.session_response {
-        let response =
-            codex_launchpad::app_logic::get_response(&config, session_id).await?;
+        let response = codex_launchpad::app_logic::get_response(&config, session_id).await?;
         println!("{}", response.content);
         return Ok(());
     }
@@ -397,8 +390,10 @@ mod tests {
 
     #[test]
     fn health_flag_needs_async() {
-        let mut args = Args::default();
-        args.health = true;
+        let args = Args {
+            health: true,
+            ..Args::default()
+        };
         assert!(args.needs_async());
     }
 }

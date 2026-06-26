@@ -202,7 +202,8 @@ impl LauncherConfig {
     }
 
     pub fn codex_provider_name(&self) -> String {
-        non_empty(&self.codex_provider_name).unwrap_or_else(|| crate::branding::DEFAULT_PROVIDER_NAME.to_string())
+        non_empty(&self.codex_provider_name)
+            .unwrap_or_else(|| crate::branding::DEFAULT_PROVIDER_NAME.to_string())
     }
 
     pub fn codex_api_key_mode(&self) -> ApiKeyMode {

@@ -8,10 +8,10 @@
 
 [![CI](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![Official builds](https://img.shields.io/badge/Official%20builds-Patreon-f96854?style=for-the-badge&logo=patreon&logoColor=white)](https://carapaceai.org/patreon)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-f97316?style=for-the-badge&logo=rust&logoColor=white)](https://rustup.rs/)
 [![React](https://img.shields.io/badge/UI-React-61dafb?style=for-the-badge&logo=react&logoColor=black)](web/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-2563eb?style=for-the-badge)]()
-[![Release](https://img.shields.io/github/v/release/CarapaceUDE/codex-launchpad?label=Release&style=for-the-badge)](https://github.com/CarapaceUDE/codex-launchpad/releases)
 
 [**Website**](https://carapaceai.org) · [**Patreon — official builds**](https://carapaceai.org/patreon) · [**Discord**](https://carapaceai.org/discord) · [**Issues**](https://github.com/CarapaceUDE/codex-launchpad/issues)
 
@@ -53,7 +53,7 @@
 | **Official binaries** | [Official build terms](OFFICIAL_BUILDS.md) — personal use, no redistribution | [Patreon supporters](https://carapaceai.org/patreon) |
 | **Self-built binary** | MIT (you compiled from source) | [Build instructions](#quick-start-gui) below |
 
-The source is fully open. Official pre-built releases are distributed through Patreon to support development. Anyone may build and run the software from source without a subscription.
+**Why Patreon for official builds?** Carapace is early-stage and needs supporter revenue to keep building. The source is fully open under MIT, so anyone can compile and run the app for free. Official pre-built binaries are a convenience for [Patreon supporters](https://carapaceai.org/patreon) while we grow. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
 
 ---
 
@@ -191,12 +191,14 @@ Runs `npm run build` automatically during `cargo build` if `web/dist/index.html`
 
 ## Testing
 
+The **CI** badge runs [GitHub Actions](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml) on every push to `master`: it checks Rust formatting, runs Clippy lints, and executes unit tests. It does not build release binaries (those are distributed via [Patreon](https://carapaceai.org/patreon) for now).
+
 ```powershell
 # Format check, unit tests, and clippy
 .\test.cmd
 ```
 
-This runs:
+This runs the same checks locally:
 ```powershell
 cargo fmt -- --check
 cargo test

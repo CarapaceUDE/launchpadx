@@ -1,6 +1,6 @@
-pub mod branding;
 pub mod acp_client;
 pub mod app_logic;
+pub mod branding;
 pub mod codex_config;
 pub mod codex_process;
 pub mod config;

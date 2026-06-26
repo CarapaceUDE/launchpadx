@@ -38,12 +38,10 @@ pub fn launch_bundle(
             .env("OPENAI_BASE_URL", base_url)
             .env("OPENAI_API_KEY", api_key);
     }
-    command
-        .spawn()
-        .map_err(|source| LauncherError::Launch {
-            program: bundle.display().to_string(),
-            source,
-        })?;
+    command.spawn().map_err(|source| LauncherError::Launch {
+        program: bundle.display().to_string(),
+        source,
+    })?;
     Ok(())
 }
 

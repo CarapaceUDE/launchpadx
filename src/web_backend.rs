@@ -1,4 +1,4 @@
-﻿use crate::app_logic;
+use crate::app_logic;
 use crate::codex_process;
 use crate::config::LauncherConfig;
 use std::fs::OpenOptions;
@@ -253,7 +253,11 @@ pub fn serve_web_ui(
     config_path: PathBuf,
     port: Option<u16>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    gui_log!(Some(root.as_path()), "INFO", "Starting headless web backend");
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Starting headless web backend"
+    );
     gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
     gui_log!(
         Some(root.as_path()),
@@ -462,8 +466,8 @@ fn config_for_mutation(
         return LauncherConfig::read(&state.config_path).map_err(|e| e.to_string());
     }
 
-    let incoming: LauncherConfig = serde_json::from_value(params.clone())
-        .map_err(|e| format!("Invalid config JSON: {e}"))?;
+    let incoming: LauncherConfig =
+        serde_json::from_value(params.clone()).map_err(|e| format!("Invalid config JSON: {e}"))?;
     match LauncherConfig::read(&state.config_path) {
         Ok(mut existing) => {
             existing.merge_from(&incoming);

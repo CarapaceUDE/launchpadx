@@ -124,7 +124,9 @@ pub fn launch(
                 command,
                 &working_directory,
                 &codex_args,
-                local_api.as_ref().map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
+                local_api
+                    .as_ref()
+                    .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
                 pid_file,
             )?;
         }
@@ -164,7 +166,9 @@ pub async fn launch_and_wait(
                 command,
                 &working_directory,
                 &codex_args,
-                local_api.as_ref().map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
+                local_api
+                    .as_ref()
+                    .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
                 pid_file,
             )?
         }
@@ -252,11 +256,7 @@ pub fn endpoint_reachable(config: &LauncherConfig) -> bool {
     let Ok(url) = ollama::tags_url_from_base(&base_url) else {
         return false;
     };
-    endpoint_responds(
-        &url,
-        config.api_key_if_configured().as_deref(),
-        2,
-    )
+    endpoint_responds(&url, config.api_key_if_configured().as_deref(), 2)
 }
 
 pub fn codex_api_ready(config: &LauncherConfig) -> bool {
