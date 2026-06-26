@@ -88,8 +88,6 @@ export function AboutPanel() {
         <p>
           <a
             href={LICENSE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
             className="text-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
           >
             {LICENSE_NOTICE}

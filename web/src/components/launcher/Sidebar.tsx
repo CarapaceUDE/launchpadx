@@ -105,8 +105,6 @@ export function Sidebar({
             <p className="text-center text-[10px] leading-relaxed text-white/45">
               <a
                 href={LICENSE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
                 title={`${APP_NAME} license`}
                 className="text-white/60 underline-offset-2 transition-colors hover:text-white/85 hover:underline"
               >

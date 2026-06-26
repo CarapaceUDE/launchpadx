@@ -22,6 +22,7 @@ const ICON_FILENAME: &str = "icon.ico";
 const ICON_PNG: &str = "icon.png";
 const DIST_DIR: &str = "web/dist";
 const DIST_INDEX: &str = "web/dist/index.html";
+const EMBEDDED_LICENSE: &str = include_str!("../LICENSE");
 const MAX_RPC_BODY_BYTES: usize = 64 * 1024;
 const MAX_LOG_ENTRIES: usize = 500;
 
@@ -908,6 +909,16 @@ fn handle_request(dist_dir: &Path, state: &Arc<Mutex<RpcState>>, mut request: ti
             Err(poisoned) => handle_rpc(&poisoned.into_inner(), method, params.clone()),
         };
         let resp = make_json_response(200, Some(result), None);
+        let _ = request.respond(resp);
+        return;
+    }
+
+    if uri == "/LICENSE" || uri == "/license" {
+        let resp = make_file_response(
+            200,
+            "text/plain; charset=utf-8",
+            EMBEDDED_LICENSE.as_bytes().to_vec(),
+        );
         let _ = request.respond(resp);
         return;
     }
