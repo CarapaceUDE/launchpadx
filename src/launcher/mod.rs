@@ -195,6 +195,7 @@ fn first_existing(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
     paths.into_iter().find(|path| path.exists())
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 fn common_path_commands() -> &'static [&'static str] {
     &["codex-app", "codex"]
 }

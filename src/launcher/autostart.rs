@@ -1,6 +1,7 @@
 #[cfg(not(target_os = "windows"))]
 use std::fs;
 use std::path::PathBuf;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::process::Command;
 
 use thiserror::Error;
