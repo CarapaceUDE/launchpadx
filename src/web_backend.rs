@@ -33,7 +33,7 @@ macro_rules! gui_log {
 }
 
 /// Locate the directory that contains `web/dist/index.html` at runtime.
-/// The GUI must not rely on compile-time `CARGO_MANIFEST_DIR` ΓÇö the binary may
+/// The GUI must not rely on compile-time `CARGO_MANIFEST_DIR` — the binary may
 /// be launched from `target/release/` or another checkout.
 pub fn resolve_gui_root() -> PathBuf {
     let mut candidates: Vec<PathBuf> = Vec::new();
@@ -382,7 +382,7 @@ pub fn launch_web_gui(
     gui_log!(Some(root.as_path()), "INFO", "Creating WebView");
     let mut attrs = WebViewAttributes {
         url: Some(server_url.parse()?),
-        devtools: true,
+        devtools: false,
         ..WebViewAttributes::default()
     };
     attrs.initialization_scripts.push(

@@ -1,22 +1,22 @@
-# Codex Launcher � Agent Instructions
+# Codex Launcher — Agent Instructions
 
 ## Project Overview
 
 Rust GUI/CLI application with a React + Vite web UI. The Rust code provides:
-- **GUI binary** (`codex-launchpad --gui`) � runs a Tauri-like webview app using `wry`/`tao`
-- **CLI binary** (`codex-launchpad`) � headless: discover models, apply Codex config, refresh model cache
-- **Embedded HTTP server** (`web_backend.rs`) � serves the web UI and exposes `/api/tags` etc.
+- **GUI mode** (`codex-launchpad --gui`) — runs a Tauri-like webview app using `wry`/`tao`
+- **CLI mode** (`codex-launchpad`) — headless: discover models, apply Codex config, refresh model cache
+- **Embedded HTTP server** (`web_backend.rs`) — serves the web UI and exposes RPC endpoints
 
 The web UI is a standalone Vite + React + Tailwind app that gets bundled and embedded into the Rust binary.
 
 ## Build System
 
-- **Rust**: `cargo build --release --bins` (two binaries: GUI and CLI)
-- **Web UI**: `cd web && npm run build` (Vite ? `web/dist/`)
+- **Rust**: `cargo build --release --bin codex-launchpad`
+- **Web UI**: `cd web && npm run build` (Vite → `web/dist/`)
 - **Build script**: `build.rs` auto-runs `npm run build` if `web/dist/index.html` is missing
 - **Build checker**: `build-check.ps1` checks timestamps and rebuilds only what's stale
-- **Full build**: `build.cmd` ? `scripts\build.ps1` ? `cargo build --bins`
-- **Tests**: `test.cmd` ? `cargo fmt -- --check && cargo test && cargo clippy --all-targets -- -D warnings`
+- **Full build**: `build.cmd` → `scripts\build.ps1` → `cargo build --bins`
+- **Tests**: `test.cmd` → `cargo fmt -- --check && cargo test && cargo clippy --all-targets -- -D warnings`
 
 ### Common build commands
 
@@ -44,14 +44,14 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt -- --check
 ```
 
-Tests are Rust unit tests. No JS/TS tests are configured for the web UI.
+Rust unit tests live under `src/`. Playwright E2E tests live in `web/e2e/` (`cd web && npm run test:e2e`).
 
 ## Web UI
 
 Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 - Source: `web/src/` (components, pages, context, types)
 - Output: `web/dist/` (gitignored)
-- Dev: `cd web && npm run dev` (if vite dev server is configured)
+- Dev: `cd web && npm run dev`
 - Build: `cd web && npm run build`
 
 ## Code Style
@@ -63,7 +63,7 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 ## Common Tasks
 
 ### Adding a new config field
-1. Update `src/main.rs` (serde struct) to include the field
+1. Update `src/config.rs` (serde struct) to include the field
 2. Update `config.example.json` with the new field
 3. Update UI components if the field is user-editable
 4. Run `cargo clippy -- -D warnings` to verify

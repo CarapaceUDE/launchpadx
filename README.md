@@ -100,11 +100,11 @@ The project targets **Windows, macOS, and Linux**. You can build on any of them 
    **Windows shortcut:** `.\run-gui.cmd` runs a stale-build check and launches the release GUI — convenience only, not required.
 
 3. **Use the UI:**
-   - **Launch tab** � select a model, launch Codex.
-   - **Models tab** � discover, cache, and select models from your API.
-   - **Settings tab** � configure provider, API key mode, Codex command path, etc.
-   - **Logs tab** � view real-time launcher logs.
-   - **About tab** � version and help info.
+   - **Launch tab** — select a model, launch Codex.
+   - **Models tab** — discover, cache, and select models from your API.
+   - **Settings tab** — configure provider, API key mode, Codex command path, etc.
+   - **Logs tab** — view real-time launcher logs.
+   - **About tab** — version and help info.
 
 ## CLI Usage (headless / automation)
 
@@ -163,9 +163,9 @@ Local settings live in `config.json` (gitignored). Public defaults are in `confi
 
 ### `codexApiKeyMode` Options
 
-- **`experimentalBearerToken`** � Writes the configured `apiKey` directly into the Codex provider config.
-- **`envKey`** � Sets `env_key = "OPENAI_API_KEY"` so Codex reads from the environment variable instead.
-- **`none`** � Writes no auth key; the endpoint must allow unauthenticated requests.
+- **`experimentalBearerToken`** — Writes the configured `apiKey` directly into the Codex provider config.
+- **`envKey`** — Sets `env_key = "OPENAI_API_KEY"` so Codex reads from the environment variable instead.
+- **`none`** — Writes no auth key; the endpoint must allow unauthenticated requests.
 
 ## Build System
 
@@ -244,31 +244,31 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 ## Project Structure
 
 ```
-+-- src/                  # Rust source (GUI + CLI binaries)
-�   +-- main.rs           # CLI entry point
-�   +-- web_backend.rs    # HTTP server + UI serving
-+-- web/                  # Vite + React + Tailwind web UI
-�   +-- src/              # React components & pages
-�   +-- dist/             # Built output (gitignored)
-�   +-- package.json      # Frontend deps
-+-- scripts/              # Windows PowerShell helpers (optional)
-�   +-- lib.ps1           # Shared helpers (Get-CargoCommand)
-�   +-- run-gui.ps1       # GUI run script
-�   +-- run-cli.ps1       # CLI run script
-�   +-- refresh-models.ps1
-�   +-- restore.ps1
-�   +-- build.ps1
-+-- build-check.ps1       # Windows incremental build checker
-+-- build.rs              # Cargo build script (auto-builds web UI)
-+-- launch-codex.ps1      # Windows Codex launcher wrapper
-+-- diagnose.ps1          # Windows health-check diagnostic
-+-- config.example.json   # Public config template
-+-- config.json           # Local config (gitignored)
-+-- run-gui.cmd           # Windows: build + launch GUI
-+-- build.cmd             # Windows: cargo build wrapper
-+-- test.cmd              # Windows: fmt + test + clippy wrapper
-+-- docs/
-    +-- architecture.md   # Architecture notes
+├── src/                  # Rust source (GUI + CLI binary)
+│   ├── main.rs           # CLI entry point
+│   └── web_backend.rs    # HTTP server + UI serving
+├── web/                  # Vite + React + Tailwind web UI
+│   ├── src/              # React components & pages
+│   ├── dist/             # Built output (gitignored)
+│   └── package.json      # Frontend deps
+├── scripts/              # Windows PowerShell helpers (optional)
+│   ├── lib.ps1           # Shared helpers (Get-CargoCommand)
+│   ├── run-gui.ps1       # GUI run script
+│   ├── run-cli.ps1       # CLI run script
+│   ├── refresh-models.ps1
+│   ├── restore.ps1
+│   └── build.ps1
+├── build-check.ps1       # Windows incremental build checker
+├── build.rs              # Cargo build script (auto-builds web UI)
+├── launch-codex.ps1      # Windows Codex launcher wrapper
+├── diagnose.ps1          # Windows health-check diagnostic
+├── config.example.json   # Public config template
+├── config.json           # Local config (gitignored)
+├── run-gui.cmd           # Windows: build + launch GUI
+├── build.cmd             # Windows: cargo build wrapper
+├── test.cmd              # Windows: fmt + test + clippy wrapper
+└── docs/
+    └── architecture.md   # Architecture notes
 ```
 
 ## Resources
