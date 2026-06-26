@@ -1,4 +1,4 @@
-# Codex Launcher — Agent Instructions
+# Codex Launchpad — Agent Instructions
 
 ## Project Overview
 

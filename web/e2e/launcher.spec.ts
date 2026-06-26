@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Codex Launcher", () => {
+test.describe("Codex Launchpad", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("page-launcher")).toBeVisible();
@@ -65,7 +65,7 @@ test.describe("Codex Launcher", () => {
 
   test("sidebar navigation reaches About", async ({ page }) => {
     await page.getByTestId("nav-about").click();
-    await expect(page.getByRole("heading", { name: "Codex Launcher" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Codex Launchpad" })).toBeVisible();
     await expect(page.getByText("A Carapace LLC community project")).toBeVisible();
     await expect(page.getByRole("link", { name: "Join Community" })).toHaveAttribute(
       "href",

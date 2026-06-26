@@ -105,7 +105,7 @@ export function GeneralSettingsCard({
                   <TextInput
                     value={codexConfig.codexProviderName}
                     onChange={(e) => onCodexConfigChange({ codexProviderName: e.target.value })}
-                    placeholder="Codex Launcher"
+                    placeholder="Codex Launchpad"
                   />
                 </FormField>
                 <FormField label="Codex Config Path">

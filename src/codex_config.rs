@@ -539,7 +539,7 @@ model_provider = "openai"
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
             codex_provider_id: Some("codex-launchpad".to_string()),
-            codex_provider_name: Some("Codex Launcher".to_string()),
+            codex_provider_name: Some("Codex Launchpad".to_string()),
             codex_model: Some("llama3.2".to_string()),
             api_key: Some("test-key".to_string()),
             ..LauncherConfig::default()
@@ -549,7 +549,7 @@ model_provider = "openai"
             config_path: path.clone(),
             model: Some("llama3.2".to_string()),
             provider_id: "codex-launchpad".to_string(),
-            provider_name: "Codex Launcher".to_string(),
+            provider_name: "Codex Launchpad".to_string(),
             base_url: "http://127.0.0.1:11434/v1".to_string(),
             api_key: "test-key".to_string(),
             api_key_mode: ApiKeyMode::ExperimentalBearerToken,

@@ -930,7 +930,7 @@ export function configToCodexForm(config: LauncherConfig): CodexConfigForm {
 
   return {
     codexProviderId: get("codexProviderId", "codex-launchpad"),
-    codexProviderName: get("codexProviderName", "Codex Launcher"),
+    codexProviderName: get("codexProviderName", "Codex Launchpad"),
     codexConfigPath: get("codexConfigPath", ""),
     codexCommand: get("codexCommand", ""),
     codexApiPort: String(config.codexApiPort ?? 4000),

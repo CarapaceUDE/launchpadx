@@ -1,4 +1,4 @@
-# Contributing to Codex Launcher
+# Contributing to Codex Launchpad
 
 Thanks for your interest in contributing! This project is a small Rust tool, and contributions are welcome.
 

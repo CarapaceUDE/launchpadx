@@ -8,7 +8,7 @@
   "persistCodexConfig": true,
   "codexModel": "llama3.2",
   "codexProviderId": "codex-launchpad",
-  "codexProviderName": "Codex Launcher",
+  "codexProviderName": "Codex Launchpad",
   "codexApiKeyMode": "experimentalBearerToken",
   "codexConfigPath": "web/e2e/fixtures/codex-config.toml",
   "codexCommand": "",

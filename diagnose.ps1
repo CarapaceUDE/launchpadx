@@ -163,7 +163,7 @@ try {
         $headers["Authorization"] = "Bearer $([string]$config.apiKey)"
     }
 
-    Write-Host "=== Codex Launcher Diagnostic ==="
+    Write-Host "=== Codex Launchpad Diagnostic ==="
 
     Write-Section "Configuration"
     Write-Host "Config path      : $ConfigPath"

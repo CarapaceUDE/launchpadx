@@ -1,4 +1,4 @@
-export const APP_NAME = "Codex Launcher";
+export const APP_NAME = "Codex Launchpad";
 export const ORG_NAME = "Carapace LLC";
 export const COPYRIGHT_YEAR = 2026;
 export const LICENSE_NAME = "MIT License";

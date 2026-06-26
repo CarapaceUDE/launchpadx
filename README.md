@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/icon.png" alt="Codex Launcher" width="88" height="88" />
+<img src="assets/icon.png" alt="Codex Launchpad" width="88" height="88" />
 
-# Codex Launcher
+# Codex Launchpad
 
 **Point [Codex](https://github.com/openai/codex) at any OpenAI-compatible API and manage providers, models, and launch settings from one desktop app.**
 
@@ -17,7 +17,7 @@
 
 <br />
 
-<img src="assets/readme-screenshot.png" alt="Codex Launcher showing Local API provider selection and model picker" width="920" />
+<img src="assets/readme-screenshot.png" alt="Codex Launchpad showing Local API provider selection and model picker" width="920" />
 
 <sub>Switch between Codex cloud sign-in and any OpenAI-compatible <code>/v1</code> endpoint, pick a model, and launch.</sub>
 
@@ -103,12 +103,12 @@ The project targets **Windows, macOS, and Linux**. You can build on any of them 
    - **Launch tab** — select a model, launch Codex.
    - **Models tab** — discover, cache, and select models from your API.
    - **Settings tab** — configure provider, API key mode, Codex command path, etc.
-   - **Logs tab** — view real-time launcher logs.
+   - **Logs tab** — view real-time launchpad logs.
    - **About tab** — version and help info.
 
 ## CLI Usage (headless / automation)
 
-You can also operate the launcher entirely from the command line on any platform.
+You can also operate the launchpad entirely from the command line on any platform.
 
 ### Building & Running
 
@@ -223,7 +223,7 @@ codex-launchpad --health
 codex-launchpad --list-models
 ```
 
-On Windows, `.\diagnose.ps1` runs a fuller connectivity check (launcher RPC, API reachability, model discovery).
+On Windows, `.\diagnose.ps1` runs a fuller connectivity check (launchpad RPC, API reachability, model discovery).
 
 ## Security
 

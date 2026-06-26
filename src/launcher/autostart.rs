@@ -144,7 +144,7 @@ pub fn enable_auto_start() -> Result<(), AutoStartError> {
     let desktop = format!(
         r#"[Desktop Entry]
 Type=Application
-Name=Codex Launcher
+Name=Codex Launchpad
 Comment=Launch Codex with local Ollama endpoint
 Exec={}
 Terminal=false
