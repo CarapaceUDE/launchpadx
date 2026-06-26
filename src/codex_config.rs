@@ -2,13 +2,25 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexConfigInspection {
+    pub config_path: PathBuf,
+    pub exists: bool,
+    pub model: Option<String>,
+    pub model_provider: Option<String>,
+    pub managed_by_launcher: bool,
+    pub launcher_base_url: Option<String>,
+    pub restore_state_available: bool,
+}
 use thiserror::Error;
 use toml_edit::{value, DocumentMut, Item, Table};
 
 use crate::config::{ApiKeyMode, LauncherConfig};
 
 const ENV_KEY_NAME: &str = "OPENAI_API_KEY";
-const BACKUP_DIR_NAME: &str = "codex-local-launcher";
+const BACKUP_DIR_NAME: &str = "codex-launchpad";
 
 #[derive(Debug, Error)]
 pub enum CodexConfigError {
@@ -93,6 +105,48 @@ pub fn apply(settings: &PersistentCodexConfig) -> Result<(), CodexConfigError> {
     apply_to_document(&mut document, settings);
     write_document(&settings.config_path, &document)
 }
+pub fn inspect(config: &LauncherConfig) -> Result<CodexConfigInspection, CodexConfigError> {
+    let config_path = config
+        .codex_config_path()
+        .map(Ok)
+        .unwrap_or_else(default_codex_config_path)?;
+    let provider_id = config.codex_provider_id();
+    let exists = config_path.exists();
+    let restore_state_available = restore_state_path(&config_path).exists();
+
+    if !exists {
+        return Ok(CodexConfigInspection {
+            config_path,
+            exists: false,
+            model: None,
+            model_provider: None,
+            managed_by_launcher: false,
+            launcher_base_url: None,
+            restore_state_available,
+        });
+    }
+
+    let document = read_document(&config_path)?;
+    let model = root_string(&document, "model");
+    let model_provider = root_string(&document, "model_provider");
+    let managed_by_launcher = model_provider.as_deref() == Some(provider_id.as_str());
+    let launcher_base_url = if managed_by_launcher {
+        provider_string(&document, &provider_id, "base_url")
+    } else {
+        None
+    };
+
+    Ok(CodexConfigInspection {
+        config_path,
+        exists: true,
+        model,
+        model_provider,
+        managed_by_launcher,
+        launcher_base_url,
+        restore_state_available,
+    })
+}
+
 pub fn restore(config: &LauncherConfig) -> Result<(PathBuf, Option<String>), CodexConfigError> {
     let config_path = config
         .codex_config_path()
@@ -261,6 +315,17 @@ fn restore_root_string(
     }
 }
 
+fn provider_string(document: &DocumentMut, provider_id: &str, key: &str) -> Option<String> {
+    document
+        .get("model_providers")
+        .and_then(Item::as_table)
+        .and_then(|providers| providers.get(provider_id))
+        .and_then(Item::as_table)
+        .and_then(|provider| provider.get(key))
+        .and_then(Item::as_str)
+        .map(str::to_string)
+}
+
 fn root_string(document: &DocumentMut, key: &str) -> Option<String> {
     document
         .as_table()
@@ -364,7 +429,7 @@ mod tests {
         PersistentCodexConfig {
             config_path: path,
             model: Some("llama3.2".to_string()),
-            provider_id: "codex-local-launcher".to_string(),
+            provider_id: "codex-launchpad".to_string(),
             provider_name: "Local Ollama".to_string(),
             base_url: "http://127.0.0.1:11434/v1".to_string(),
             api_key: "test-key".to_string(),
@@ -389,8 +454,8 @@ conversationDetailMode = "STEPS_COMMANDS"
         assert!(text.contains(r#"approval_policy = "never""#));
         assert!(text.contains("[desktop]"));
         assert!(text.contains(r#"model = "llama3.2""#));
-        assert!(text.contains(r#"model_provider = "codex-local-launcher""#));
-        assert!(text.contains("[model_providers.codex-local-launcher]"));
+        assert!(text.contains(r#"model_provider = "codex-launchpad""#));
+        assert!(text.contains("[model_providers.codex-launchpad]"));
         assert!(text.contains(r#"base_url = "http://127.0.0.1:11434/v1""#));
         assert!(text.contains(r#"experimental_bearer_token = "test-key""#));
     }
@@ -398,7 +463,7 @@ conversationDetailMode = "STEPS_COMMANDS"
     #[test]
     fn env_key_mode_removes_persisted_bearer_token() {
         let mut document = r#"
-[model_providers.codex-local-launcher]
+[model_providers.codex-launchpad]
 experimental_bearer_token = "old"
 "#
         .parse::<DocumentMut>()
@@ -428,9 +493,9 @@ experimental_bearer_token = "old"
     fn restore_returns_previous_root_values_and_removes_provider() {
         let mut document = r#"
 model = "llama3.2"
-model_provider = "codex-local-launcher"
+model_provider = "codex-launchpad"
 
-[model_providers.codex-local-launcher]
+[model_providers.codex-launchpad]
 name = "Local Ollama"
 "#
         .parse::<DocumentMut>()
@@ -446,13 +511,93 @@ name = "Local Ollama"
             model_catalog_json: None,
         };
 
-        restore_root_values(&mut document, "codex-local-launcher", Some(&state));
-        remove_provider(&mut document, "codex-local-launcher");
+        restore_root_values(&mut document, "codex-launchpad", Some(&state));
+        remove_provider(&mut document, "codex-launchpad");
         let text = document.to_string();
 
         assert!(text.contains(r#"model = "gpt-5.5""#));
         assert!(!text.contains("model_provider"));
-        assert!(!text.contains("codex-local-launcher"));
+        assert!(!text.contains("codex-launchpad"));
+    }
+
+    #[test]
+    fn apply_and_restore_round_trip() {
+        let dir = std::env::temp_dir().join(format!(
+            "codex-launcher-roundtrip-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+model = "gpt-test"
+model_provider = "openai"
+"#,
+        )
+        .expect("seed config");
+
+        let mut launcher = LauncherConfig::default();
+        launcher.codex_config_path = Some(path.to_string_lossy().to_string());
+        launcher.codex_provider_id = Some("codex-launchpad".to_string());
+        launcher.codex_provider_name = Some("Codex Launcher".to_string());
+        launcher.codex_model = Some("llama3.2".to_string());
+        launcher.api_key = Some("test-key".to_string());
+
+        let settings = PersistentCodexConfig {
+            config_path: path.clone(),
+            model: Some("llama3.2".to_string()),
+            provider_id: "codex-launchpad".to_string(),
+            provider_name: "Codex Launcher".to_string(),
+            base_url: "http://127.0.0.1:11434/v1".to_string(),
+            api_key: "test-key".to_string(),
+            api_key_mode: ApiKeyMode::ExperimentalBearerToken,
+        };
+
+        apply(&settings).expect("apply");
+        let managed = inspect(&launcher).expect("inspect after apply");
+        assert!(managed.managed_by_launcher);
+        assert_eq!(managed.model.as_deref(), Some("llama3.2"));
+
+        let (restored_path, warning) = restore(&launcher).expect("restore");
+        assert!(warning.is_none());
+        assert_eq!(restored_path, path);
+
+        let document = read_document(&path).expect("read restored");
+        assert_eq!(root_string(&document, "model").as_deref(), Some("gpt-test"));
+        assert_eq!(root_string(&document, "model_provider").as_deref(), Some("openai"));
+        assert!(!document.to_string().contains("codex-launchpad"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn inspect_detects_managed_provider() {
+        let path = std::env::temp_dir().join("codex-launcher-inspect-test.toml");
+        let text = r#"
+model = "llama3.2"
+model_provider = "codex-launchpad"
+
+[model_providers.codex-launchpad]
+base_url = "http://127.0.0.1:11434/v1"
+"#;
+        std::fs::write(&path, text).expect("write temp config");
+
+        let mut launcher = LauncherConfig::default();
+        launcher.codex_config_path = Some(path.to_string_lossy().to_string());
+        launcher.codex_provider_id = Some("codex-launchpad".to_string());
+
+        let inspection = inspect(&launcher).expect("inspect");
+        assert!(inspection.exists);
+        assert!(inspection.managed_by_launcher);
+        assert_eq!(inspection.model.as_deref(), Some("llama3.2"));
+        assert_eq!(
+            inspection.launcher_base_url.as_deref(),
+            Some("http://127.0.0.1:11434/v1")
+        );
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
@@ -461,14 +606,14 @@ name = "Local Ollama"
 model = "gpt-5.5"
 model_provider = "openai"
 
-[model_providers.codex-local-launcher]
+[model_providers.codex-launchpad]
 name = "Local Ollama"
 "#
         .parse::<DocumentMut>()
         .expect("valid TOML");
 
-        restore_root_values(&mut document, "codex-local-launcher", None);
-        remove_provider(&mut document, "codex-local-launcher");
+        restore_root_values(&mut document, "codex-launchpad", None);
+        remove_provider(&mut document, "codex-launchpad");
         let text = document.to_string();
 
         assert!(text.contains(r#"model = "gpt-5.5""#));

@@ -360,7 +360,7 @@ pub fn launch_web_gui(
     // Create a single visible window with WebView embedded
     gui_log!(Some(root.as_path()), "INFO", "Creating window");
     let window_builder = WindowBuilder::new()
-        .with_title("Codex Local Launcher")
+        .with_title(crate::branding::APP_NAME)
         .with_visible(true)
         .with_inner_size(LogicalSize::new(1280.0, 800.0));
 
@@ -425,11 +425,14 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
         "healthCheck" => rpc_health_check(state, params),
         "listModels" => rpc_list_models(state),
         "refreshModels" => rpc_refresh_models(state, params),
-        "writeCodexConfig" => rpc_write_codex_config(state),
-        "revertCodexConfig" => rpc_revert_codex_config(state),
+        "writeCodexConfig" => rpc_write_codex_config(state, params),
+        "syncCodexConfig" => rpc_sync_codex_config(state, params),
+        "inspectCodexConfig" => rpc_inspect_codex_config(state),
+        "revertCodexConfig" => rpc_revert_codex_config(state, params),
         "detectCodex" => rpc_detect_codex(state),
         "killCodexByPid" => rpc_kill_codex_by_pid(params),
         "toggleAutoStart" => rpc_toggle_auto_start(state),
+        "setAutoStart" => rpc_set_auto_start(state, params),
         "openDirectoryPicker" => rpc_open_directory_picker(),
         "getAppLogs" => rpc_get_app_logs(state),
         _ => serde_json::json!({"error": format!("Unknown method: {}", method)}),
@@ -448,13 +451,44 @@ fn config_for_request(
     state: &RpcState,
     params: &serde_json::Value,
 ) -> Result<LauncherConfig, String> {
+    config_with_overlay(state, params, false)
+}
+
+fn config_for_mutation(
+    state: &RpcState,
+    params: &serde_json::Value,
+) -> Result<LauncherConfig, String> {
+    if params.is_null() || params.as_object().is_some_and(|fields| fields.is_empty()) {
+        return LauncherConfig::read(&state.config_path).map_err(|e| e.to_string());
+    }
+
+    let incoming: LauncherConfig = serde_json::from_value(params.clone())
+        .map_err(|e| format!("Invalid config JSON: {e}"))?;
+    match LauncherConfig::read(&state.config_path) {
+        Ok(mut existing) => {
+            existing.merge_from(&incoming);
+            Ok(existing)
+        }
+        Err(_) => Ok(incoming),
+    }
+}
+
+fn config_with_overlay(
+    state: &RpcState,
+    params: &serde_json::Value,
+    full_overlay: bool,
+) -> Result<LauncherConfig, String> {
     let incoming = serde_json::from_value::<LauncherConfig>(params.clone()).ok();
     let has_overlay = incoming.as_ref().is_some_and(|cfg| {
-        cfg.ollama_ip.is_some()
-            || cfg.openai_base_url.is_some()
-            || cfg.ollama_port.is_some()
-            || cfg.ollama_scheme.is_some()
-            || cfg.codex_model.is_some()
+        if full_overlay {
+            true
+        } else {
+            cfg.ollama_ip.is_some()
+                || cfg.openai_base_url.is_some()
+                || cfg.ollama_port.is_some()
+                || cfg.ollama_scheme.is_some()
+                || cfg.codex_model.is_some()
+        }
     });
 
     if has_overlay {
@@ -511,7 +545,7 @@ fn rpc_launch(state: &RpcState, params: serde_json::Value) -> serde_json::Value 
             Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
         }
     };
-    if let Err(e) = app_logic::write_config(&config) {
+    if let Err(e) = app_logic::write_config_for_launch(&config) {
         return serde_json::json!({"error": e.to_string()});
     }
     let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
@@ -616,24 +650,46 @@ fn rpc_refresh_models(state: &RpcState, params: serde_json::Value) -> serde_json
     }
 }
 
-fn rpc_write_codex_config(state: &RpcState) -> serde_json::Value {
-    let config = match LauncherConfig::read(&state.config_path) {
+fn rpc_write_codex_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_mutation(state, &params) {
         Ok(c) => c,
-        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+        Err(e) => return serde_json::json!({"error": e}),
     };
-    match app_logic::write_config(&config) {
-        Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
+    match app_logic::sync_codex_config(&config) {
+        Ok(msg) => {
+            let inspection = app_logic::inspect_codex_config(&config).ok();
+            serde_json::json!({"ok": true, "message": msg, "inspection": inspection})
+        }
         Err(e) => serde_json::json!({"error": e.to_string()}),
     }
 }
 
-fn rpc_revert_codex_config(state: &RpcState) -> serde_json::Value {
+fn rpc_sync_codex_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    rpc_write_codex_config(state, params)
+}
+
+fn rpc_inspect_codex_config(state: &RpcState) -> serde_json::Value {
     let config = match LauncherConfig::read(&state.config_path) {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
     };
+    match app_logic::inspect_codex_config(&config) {
+        Ok(inspection) => serde_json::to_value(inspection)
+            .unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize inspection"})),
+        Err(e) => serde_json::json!({"error": e.to_string()}),
+    }
+}
+
+fn rpc_revert_codex_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_mutation(state, &params) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": e}),
+    };
     match app_logic::revert_codex_config(&config) {
-        Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
+        Ok(msg) => {
+            let inspection = app_logic::inspect_codex_config(&config).ok();
+            serde_json::json!({"ok": true, "message": msg, "inspection": inspection})
+        }
         Err(e) => serde_json::json!({"error": e.to_string()}),
     }
 }
@@ -701,14 +757,37 @@ fn rpc_toggle_auto_start(state: &RpcState) -> serde_json::Value {
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
     };
     let enabled = config.auto_start.unwrap_or(false);
+    rpc_apply_auto_start(&config, !enabled)
+}
+
+fn rpc_set_auto_start(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let enabled = params
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let mut config = match LauncherConfig::read(&state.config_path) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+    };
+
+    config.auto_start = Some(enabled);
+    if let Err(e) = config.write(&state.config_path) {
+        return serde_json::json!({"error": format!("Cannot save config: {}", e)});
+    }
+
+    rpc_apply_auto_start(&config, enabled)
+}
+
+fn rpc_apply_auto_start(config: &LauncherConfig, enabled: bool) -> serde_json::Value {
     if enabled {
-        match app_logic::disable_auto_start(&config) {
-            Ok(msg) => serde_json::json!({"ok": true, "enabled": false, "message": msg}),
+        match app_logic::enable_auto_start(config) {
+            Ok(msg) => serde_json::json!({"ok": true, "enabled": true, "message": msg}),
             Err(e) => serde_json::json!({"error": e.to_string()}),
         }
     } else {
-        match app_logic::enable_auto_start(&config) {
-            Ok(msg) => serde_json::json!({"ok": true, "enabled": true, "message": msg}),
+        match app_logic::disable_auto_start(config) {
+            Ok(msg) => serde_json::json!({"ok": true, "enabled": false, "message": msg}),
             Err(e) => serde_json::json!({"error": e.to_string()}),
         }
     }

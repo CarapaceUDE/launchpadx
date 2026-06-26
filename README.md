@@ -1,27 +1,80 @@
-# Codex Local Launcher
+<div align="center">
 
-Launch [Codex](https://github.com/openai/codex) against an Ollama-compatible endpoint and manage the Codex desktop app config from a small local UI.
+<img src="assets/icon.png" alt="Codex Launcher" width="88" height="88" />
 
-[![CI](https://github.com/codex-local-launcher/codex-local-launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/codex-local-launcher/codex-local-launcher/actions/workflows/ci.yml)
+# Codex Launcher
+
+**Point [Codex](https://github.com/openai/codex) at any OpenAI-compatible API and manage providers, models, and launch settings from one desktop app.**
+
+[![CI](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-f97316?style=for-the-badge&logo=rust&logoColor=white)](https://rustup.rs/)
+[![React](https://img.shields.io/badge/UI-React-61dafb?style=for-the-badge&logo=react&logoColor=black)](web/)
+[![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-2563eb?style=for-the-badge)]()
+[![Release](https://img.shields.io/github/v/release/CarapaceUDE/codex-launchpad?label=Release&style=for-the-badge)](https://github.com/CarapaceUDE/codex-launchpad/releases)
+
+[**Website**](https://carapaceai.org) Â· [**Patreon â€” official builds**](https://carapaceai.org/patreon) Â· [**Discord**](https://carapaceai.org/discord) Â· [**Issues**](https://github.com/CarapaceUDE/codex-launchpad/issues)
+
+<br />
+
+<img src="assets/readme-screenshot.png" alt="Codex Launcher showing Local API provider selection and model picker" width="920" />
+
+<sub>Switch between Codex cloud sign-in and any OpenAI-compatible <code>/v1</code> endpoint, pick a model, and launch.</sub>
+
+</div>
+
+## Features
+
+- **Dual provider modes** â€” Codex cloud account or route through any OpenAI-compatible API (vLLM, LiteLLM, OpenRouter, your own gateway, etc.)
+- **Model discovery** â€” fetch and cache models from your endpoint's API
+- **Codex config sync** â€” writes and restores `~/.codex/config.toml` safely
+- **Desktop GUI + CLI** â€” full UI or scriptable headless workflows
+- **Cross-platform** â€” Windows, macOS, and Linux builds
+- **Dark / light theme**
+
+## Contents
+
+- [Distribution](#distribution)
+- [Quick Start](#quick-start-gui)
+- [CLI usage](#cli-usage-headless--automation)
+- [Config](#config)
+- [Build system](#build-system)
+- [Testing](#testing)
+- [Security](#security)
+- [License](#license)
+
+---
+
+## Distribution
+
+| What | License / terms | How to get it |
+| ---- | --------------- | ------------- |
+| **Source code** | [MIT License](LICENSE) â€” free for everyone | This repository |
+| **Official binaries** | [Official build terms](OFFICIAL_BUILDS.md) â€” personal use, no redistribution | [Patreon supporters](https://carapaceai.org/patreon) |
+| **Self-built binary** | MIT (you compiled from source) | [Build instructions](#quick-start-gui) below |
+
+The source is fully open. Official pre-built releases are distributed through Patreon to support development. Anyone may build and run the software from source without a subscription.
 
 ---
 
 ## Prerequisites
 
-- **Rust / Cargo** – `rustc` 1.75+ (install via [rustup](https://rustup.rs/))
+- **Rust / Cargo** ï¿½ `rustc` 1.75+ (install via [rustup](https://rustup.rs/))
 - **Node.js** 18+ (for the web UI)
 - **Windows 10+** (tested on Windows; other platforms may work for the CLI)
-- **Codex CLI or Desktop App** – installed and discoverable on PATH (or set `codexCommand` in config)
-- An **Ollama server** or any OpenAI-compatible endpoint running on your network
+- **Codex CLI or Desktop App** ï¿½ installed and discoverable on PATH (or set `codexCommand` in config)
+- An **OpenAI-compatible API** reachable from your machine (local server, LAN host, or remote gateway)
 
 ## Quick Start (GUI)
 
-The easiest way to use the launcher is the bundled GUI:
+**Official builds:** download the latest binary from [Patreon](https://carapaceai.org/patreon).
+
+**From source:** build and run locally:
 
 1. **Copy and edit the config:**
    ```powershell
    Copy-Item config.example.json config.json
-   # Edit config.json with your Ollama IP / API key
+   # Edit config.json with your API host, port, and key
    notepad config.json
    ```
 
@@ -30,14 +83,14 @@ The easiest way to use the launcher is the bundled GUI:
    .\run-gui.cmd
    ```
 
-   This script runs a build check first (Rust + web UI) and launches `target\release\codex-local-launcher.exe --gui`.
+   This script runs a build check first (Rust + web UI) and launches `target\release\codex-launchpad.exe --gui`.
 
 3. **Use the UI:**
-   - **Launch tab** – select a model, launch Codex.
-   - **Models tab** – discover, cache, and select Ollama models.
-   - **Settings tab** – configure provider, API key mode, Codex command path, etc.
-   - **Logs tab** – view real-time launcher logs.
-   - **About tab** – version and help info.
+   - **Launch tab** ï¿½ select a model, launch Codex.
+   - **Models tab** ï¿½ discover, cache, and select models from your API.
+   - **Settings tab** ï¿½ configure provider, API key mode, Codex command path, etc.
+   - **Logs tab** ï¿½ view real-time launcher logs.
+   - **About tab** ï¿½ version and help info.
 
 ## CLI Usage (headless / automation)
 
@@ -56,12 +109,12 @@ cargo build --release
 .\scripts\run-cli.ps1 --config config.json
 ```
 
-The CLI binary is `target\debug\codex-local-launcher.exe` (debug) or `target\release\codex-local-launcher.exe` (release).
+The CLI binary is `target\debug\codex-launchpad.exe` (debug) or `target\release\codex-launchpad.exe` (release).
 
 ### Refreshing Models
 
 ```powershell
-# Discover and cache models from your Ollama endpoint
+# Discover and cache models from your configured API
 .\scripts\refresh-models.ps1
 
 # Or with a specific config
@@ -92,12 +145,12 @@ Local settings live in `config.json` (gitignored). Public defaults are in `confi
 
 | Field | Type | Description |
 |---|---|---|
-| `ollamaIp` | string | IP or hostname of the Ollama server |
-| `ollamaPort` | int | Port (default `11434`) |
+| `ollamaIp` | string | Hostname or IP of the OpenAI-compatible API server |
+| `ollamaPort` | int | API port (default `11434`; use whatever your server exposes) |
 | `ollamaScheme` | string | `http` or `https` (default `http`) |
-| `apiKey` | string | API key for the Ollama-compatible endpoint |
+| `apiKey` | string | API key for the endpoint, if required |
 | `persistCodexConfig` | bool | Write a provider into `~/.codex/config.toml` (default `true`) |
-| `discoverOllamaModels` | bool | Auto-fetch model list on startup (default `true`) |
+| `discoverOllamaModels` | bool | Auto-fetch models from `/v1/models` on startup (default `true`) |
 | `codexModel` | string | Override Codex model; leave empty to use UI selection |
 | `codexProviderId` | string | Provider identifier written to Codex config |
 | `codexProviderName` | string | Display name for the provider |
@@ -109,30 +162,30 @@ Local settings live in `config.json` (gitignored). Public defaults are in `confi
 
 ### `codexApiKeyMode` Options
 
-- **`experimentalBearerToken`** – Writes the configured `apiKey` directly into the Codex provider config.
-- **`envKey`** – Sets `env_key = "OPENAI_API_KEY"` so Codex reads from the environment variable instead.
-- **`none`** – Writes no auth key; the endpoint must allow unauthenticated requests.
+- **`experimentalBearerToken`** ï¿½ Writes the configured `apiKey` directly into the Codex provider config.
+- **`envKey`** ï¿½ Sets `env_key = "OPENAI_API_KEY"` so Codex reads from the environment variable instead.
+- **`none`** ï¿½ Writes no auth key; the endpoint must allow unauthenticated requests.
 
 ## Build System
 
-### `build.cmd` – Full Build
+### `build.cmd` ï¿½ Full Build
 
 Runs a conditional build script (`scripts\build.ps1`) that invokes `cargo build --bins`. This compiles the Rust binaries (GUI and CLI).
 
-### `build-check.ps1` – Smart Build Check
+### `build-check.ps1` ï¿½ Smart Build Check
 
 Used by `run-gui.cmd`. Checks whether the release binary or web UI bundle is stale and rebuilds only what's needed:
 - Compares source file timestamps against the existing binary and web bundle.
-- Builds Rust if any `.rs` source is newer than `target\release\codex-local-launcher.exe`.
+- Builds Rust if any `.rs` source is newer than `target\release\codex-launchpad.exe`.
 - Runs `npm run build` in `web/` if any web source is newer than `web\dist\assets\index.js`.
 - Stages the web build output and `config.json` next to the release binary.
 
-### `run-gui.cmd` – Launch GUI
+### `run-gui.cmd` ï¿½ Launch GUI
 
 1. Runs `build-check.ps1` to ensure everything is built.
-2. Launches `target\release\codex-local-launcher.exe --gui`.
+2. Launches `target\release\codex-launchpad.exe --gui`.
 
-### `build.rs` – Cargo Build Script
+### `build.rs` ï¿½ Cargo Build Script
 
 Runs `npm run build` automatically during `cargo build` if `web/dist/index.html` is missing. Ensures the web UI is always present alongside the binary.
 
@@ -157,29 +210,41 @@ cargo clippy --all-targets -- -D warnings
 .\diagnose.ps1
 ```
 
-Tests RPC endpoint, Ollama health, and Ollama model list. Helpful for troubleshooting connectivity issues.
+Tests launcher RPC, API connectivity, and model list discovery. Helpful for troubleshooting endpoint issues.
 
 ## Security
 
 > **API keys are stored in plaintext** in `config.json` and `~/.codex/config.toml`. Restrict file permissions on multi-user systems. Consider using `envKey` mode or an external secret manager for sensitive deployments.
 
+To report a security vulnerability, see [SECURITY.md](SECURITY.md). Please do not file public GitHub issues for security reports.
+
+## License
+
+Source code is licensed under the [MIT License](LICENSE). Copyright (c) 2026 Carapace LLC.
+
+Official pre-built binaries are distributed separately under the [Official Build terms](OFFICIAL_BUILDS.md).
+
+## Trademark
+
+This project is an independent tool and is not affiliated with, endorsed by, or sponsored by OpenAI. Codex is a trademark of OpenAI.
+
 ## Project Structure
 
 ```
 +-- src/                  # Rust source (GUI + CLI binaries)
-¦   +-- main.rs           # CLI entry point
-¦   +-- web_backend.rs    # HTTP server + UI serving
+ï¿½   +-- main.rs           # CLI entry point
+ï¿½   +-- web_backend.rs    # HTTP server + UI serving
 +-- web/                  # Vite + React + Tailwind web UI
-¦   +-- src/              # React components & pages
-¦   +-- dist/             # Built output (gitignored)
-¦   +-- package.json      # Frontend deps
+ï¿½   +-- src/              # React components & pages
+ï¿½   +-- dist/             # Built output (gitignored)
+ï¿½   +-- package.json      # Frontend deps
 +-- scripts/              # PowerShell scripts
-¦   +-- lib.ps1           # Shared helpers (Get-CargoCommand)
-¦   +-- run-gui.ps1       # GUI run script
-¦   +-- run-cli.ps1       # CLI run script
-¦   +-- refresh-models.ps1
-¦   +-- restore.ps1
-¦   +-- build.ps1
+ï¿½   +-- lib.ps1           # Shared helpers (Get-CargoCommand)
+ï¿½   +-- run-gui.ps1       # GUI run script
+ï¿½   +-- run-cli.ps1       # CLI run script
+ï¿½   +-- refresh-models.ps1
+ï¿½   +-- restore.ps1
+ï¿½   +-- build.ps1
 +-- build-check.ps1       # Smart build checker (used by run-gui.cmd)
 +-- build.rs              # Cargo build script (auto-builds web UI)
 +-- launch-codex.ps1      # Standalone Codex launcher
@@ -198,3 +263,7 @@ Tests RPC endpoint, Ollama health, and Ollama model list. Helpful for troublesho
 - [Architecture docs](docs/architecture.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [License](LICENSE)
+- [Official build terms](OFFICIAL_BUILDS.md)
+- [Release process](docs/release-process.md)

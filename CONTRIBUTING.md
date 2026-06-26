@@ -1,6 +1,8 @@
-# Contributing to Codex Local Launcher
+# Contributing to Codex Launcher
 
 Thanks for your interest in contributing! This project is a small Rust tool, and contributions are welcome.
+
+**Source code** is MIT-licensed and open to everyone. **Official pre-built binaries** are distributed separately to Patreon supporters — see [OFFICIAL_BUILDS.md](OFFICIAL_BUILDS.md) and [docs/release-process.md](docs/release-process.md).
 
 ## Getting Started
 
@@ -28,15 +30,16 @@ cargo build --bins
 | `.\run-gui.cmd` | Launch the desktop UI |
 | `.\launch-codex.cmd` | Write config and launch Codex |
 | `.\test.cmd` | Run `cargo fmt --check`, `cargo test`, `cargo clippy` |
+| `cd web && npm run screenshot:readme` | Regenerate `assets/readme-screenshot.png` for the README |
 
 ### CLI Options
 
 ```
-codex-local-launcher --config <path>
-codex-local-launcher --write-config-only
-codex-local-launcher --refresh-models
-codex-local-launcher --list-models
-codex-local-launcher --restore
+codex-launchpad --config <path>
+codex-launchpad --write-config-only
+codex-launchpad --refresh-models
+codex-launchpad --list-models
+codex-launchpad --restore
 ```
 
 ## How to Contribute
@@ -80,4 +83,4 @@ Please include:
 - OS and version
 - Launcher version (check `cargo pkgid`)
 - Steps to reproduce
-- Relevant log output (`~/.codex-local-launcher/error.log` or `codex-local-launcher-gui.error.log`)
+- Relevant log output (`~/.codex-launchpad/error.log` or `codex-launchpad-gui.error.log`)

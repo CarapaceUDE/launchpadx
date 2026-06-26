@@ -19,6 +19,7 @@ web/dist/
 web/playwright-report/
 web/test-results/
 web/blob-report/
+web/e2e/fixtures/backups/
 
 # Temporary workspace data
 /.tmp/

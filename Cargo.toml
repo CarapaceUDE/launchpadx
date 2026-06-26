@@ -1,9 +1,9 @@
-﻿[package]
-name = "codex-local-launcher"
+[package]
+name = "codex-launchpad"
 version = "0.1.0"
-repository = "https://github.com/codex-local-launcher/codex-local-launcher"
+repository = "https://github.com/CarapaceUDE/codex-launchpad"
 edition = "2021"
-description = "Launch Codex against an Ollama-compatible OpenAI endpoint."
+description = "Desktop launcher to point Codex at any OpenAI-compatible API."
 license = "MIT"
 
 [dependencies]

@@ -1,3 +1,4 @@
+import type { CodexConfigInspection } from './lib/codexProfile';
 import type { LauncherConfig, CodexProcessInfo } from './types';
 
 interface LauncherResponse<T> {
@@ -21,14 +22,17 @@ interface CodexIPC {
     healthCheck(cfg?: LauncherConfig): Promise<LauncherResponse<{ running: boolean; apiReady: boolean; endpointReady?: boolean; pid?: number | null; method?: string | null; error?: string }>>;
     listModels(): Promise<LauncherResponse<{ models: { name: string; size: number; digest: string; modified: string }[] }>>;
     refreshModels(cfg?: LauncherConfig): Promise<LauncherResponse<{ models: { name: string; size: number; digest: string; modified: string }[]; message?: string; endpoint?: string; fetchedFrom?: string }>>;
-    writeCodexConfig(): Promise<LauncherResponse<{ message?: string }>>;
-    revertCodexConfig(): Promise<LauncherResponse<{ message?: string }>>;
+    writeCodexConfig(cfg?: LauncherConfig): Promise<LauncherResponse<{ message?: string; inspection?: CodexConfigInspection }>>;
+    syncCodexConfig(cfg?: LauncherConfig): Promise<LauncherResponse<{ message?: string; inspection?: CodexConfigInspection }>>;
+    inspectCodexConfig(): Promise<LauncherResponse<CodexConfigInspection>>;
+    revertCodexConfig(cfg?: LauncherConfig): Promise<LauncherResponse<{ message?: string; inspection?: CodexConfigInspection }>>;
     detectCodex(): Promise<LauncherResponse<CodexProcessInfo>>;
     killCodexByPid(pid: number): Promise<LauncherResponse<{ message?: string }>>;
 
     getAppLogs(): Promise<LauncherResponse<{ logs: LogEntry[] }>>;
     saveSettings(settings: Record<string, unknown>): Promise<LauncherResponse<{ message?: string }>>;
     toggleAutoStart(): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
+    setAutoStart(enabled: boolean): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
 }
 
 declare global {

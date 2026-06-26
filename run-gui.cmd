@@ -12,14 +12,14 @@ if errorlevel 1 (
 )
 
 :: Check binary exists (release)
-if not exist "%ROOT%target\release\codex-local-launcher.exe" (
+if not exist "%ROOT%target\release\codex-launchpad.exe" (
     echo Error: release binary not built. Check build output above.
     pause
     exit /b 1
 )
 
 :: Keep the console attached so runtime errors remain visible.
-"%ROOT%target\release\codex-local-launcher.exe" --gui
+"%ROOT%target\release\codex-launchpad.exe" --gui
 if errorlevel 1 (
     echo Error: GUI exited unexpectedly. Check the output above.
     pause

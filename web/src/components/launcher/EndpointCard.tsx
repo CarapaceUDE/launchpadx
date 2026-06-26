@@ -43,7 +43,7 @@ export function EndpointCard({
               data-testid="endpoint-scheme"
               value={scheme}
               onChange={(e) => onChange({ scheme: e.target.value as "http" | "https" })}
-              className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+              className="themed-native-select h-[38px] w-full px-3 pr-9 text-sm focus:ring-4"
             >
               <option value="http">http</option>
               <option value="https">https</option>

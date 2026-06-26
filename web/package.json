@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "screenshot:readme": "playwright test e2e/readme-screenshot.spec.ts"
   },
   "dependencies": {
     "lucide-react": "^0.575.0",

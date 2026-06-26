@@ -320,6 +320,22 @@ html, body {
 .status-bar.error { color: var(--warning-text); }
 .status-bar.success { color: var(--success); }
 
+/* Compact model select marquee */
+.marquee-select-label {
+      display: inline-block;
+      padding-right: 1.5rem;
+}
+
+select:hover + div .marquee-select-label,
+select:focus + div .marquee-select-label {
+      animation: marquee-scroll 10s linear infinite;
+}
+
+@keyframes marquee-scroll {
+      0%, 12% { transform: translateX(0); }
+      88%, 100% { transform: translateX(calc(-100% + 7.5rem)); }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
        .sidebar { display: none; }

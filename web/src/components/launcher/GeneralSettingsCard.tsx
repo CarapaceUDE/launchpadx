@@ -98,14 +98,14 @@ export function GeneralSettingsCard({
                   <TextInput
                     value={codexConfig.codexProviderId}
                     onChange={(e) => onCodexConfigChange({ codexProviderId: e.target.value })}
-                    placeholder="codex-local-launcher"
+                    placeholder="codex-launchpad"
                   />
                 </FormField>
                 <FormField label="Provider Name">
                   <TextInput
                     value={codexConfig.codexProviderName}
                     onChange={(e) => onCodexConfigChange({ codexProviderName: e.target.value })}
-                    placeholder="Codex Local Launcher"
+                    placeholder="Codex Launcher"
                   />
                 </FormField>
                 <FormField label="Codex Config Path">
@@ -134,7 +134,7 @@ export function GeneralSettingsCard({
                   <select
                     value={codexConfig.codexApiScheme}
                     onChange={(e) => onCodexConfigChange({ codexApiScheme: e.target.value })}
-                    className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                    className="themed-native-select h-[38px] w-full px-3 text-sm focus:ring-4"
                   >
                     <option value="http">http</option>
                     <option value="https">https</option>
@@ -152,7 +152,7 @@ export function GeneralSettingsCard({
                 <select
                   value={codexConfig.codexApiKeyMode}
                   onChange={(e) => onCodexConfigChange({ codexApiKeyMode: e.target.value })}
-                  className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                  className="themed-native-select h-[38px] w-full px-3 text-sm focus:ring-4"
                 >
                   <option value="envKey">Environment Variable</option>
                   <option value="experimentalBearerToken">Experimental Bearer Token</option>

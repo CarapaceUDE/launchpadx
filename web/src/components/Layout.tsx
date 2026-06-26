@@ -23,7 +23,7 @@ export default function Layout({ children, darkMode, onToggleDarkMode, statusMes
       return (
                       <>
                           <header className="header">
-                              <h1>Codex Local Launcher</h1>
+                              <h1>Codex Launcher</h1>
                               <div className="header-controls">
                                   <label className="theme-toggle" aria-label="Toggle dark mode">
                                       <input

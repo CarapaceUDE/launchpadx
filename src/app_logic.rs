@@ -23,6 +23,28 @@ pub fn codex_pid_file(config_path: &Path) -> PathBuf {
     config_path.with_extension("pid")
 }
 
+pub fn codex_managed_by_launcher(config: &LauncherConfig) -> bool {
+    codex_config::inspect(config)
+        .map(|inspection| inspection.managed_by_launcher)
+        .unwrap_or(false)
+}
+
+/// Writes launcher-managed settings only when Local API is the active Codex provider.
+pub fn write_config_for_launch(config: &LauncherConfig) -> Result<Option<String>, Box<dyn Error>> {
+    if !codex_managed_by_launcher(config) {
+        return Ok(None);
+    }
+    write_config(config).map(Some)
+}
+
+fn local_api_env(config: &LauncherConfig) -> Result<Option<(String, String)>, Box<dyn Error>> {
+    if !codex_managed_by_launcher(config) {
+        return Ok(None);
+    }
+
+    Ok(Some((config.openai_base_url()?, config.api_key()?)))
+}
+
 pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
     let base_url = config.openai_base_url()?;
     let api_key = config.api_key()?;
@@ -87,8 +109,7 @@ pub fn launch(
         return Err(format!("Codex is already running (detected via {method})").into());
     }
 
-    let base_url = config.openai_base_url()?;
-    let api_key = config.api_key()?;
+    let local_api = local_api_env(config)?;
     let working_directory = config.working_directory(root)?;
     let codex_args = config.codex_args();
     let target = launcher::resolve(config)?;
@@ -103,8 +124,7 @@ pub fn launch(
                 command,
                 &working_directory,
                 &codex_args,
-                &base_url,
-                &api_key,
+                local_api.as_ref().map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
                 pid_file,
             )?;
         }
@@ -112,7 +132,13 @@ pub fn launch(
             launcher::launch_windows_start_app(app_id)?;
         }
         LaunchTarget::MacAppBundle(bundle) => {
-            launcher::launch_macos_bundle(bundle, &working_directory, &base_url, &api_key)?;
+            launcher::launch_macos_bundle(
+                bundle,
+                &working_directory,
+                local_api
+                    .as_ref()
+                    .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
+            )?;
         }
     }
 
@@ -124,8 +150,7 @@ pub async fn launch_and_wait(
     root: &Path,
     pid_file: &std::path::Path,
 ) -> Result<CodexProcess, Box<dyn Error>> {
-    let base_url = config.openai_base_url()?;
-    let api_key = config.api_key()?;
+    let local_api = local_api_env(config)?;
     let working_directory = config.working_directory(root)?;
     let codex_args = config.codex_args();
     let target = launcher::resolve(config)?;
@@ -139,8 +164,7 @@ pub async fn launch_and_wait(
                 command,
                 &working_directory,
                 &codex_args,
-                &base_url,
-                &api_key,
+                local_api.as_ref().map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
                 pid_file,
             )?
         }
@@ -151,7 +175,13 @@ pub async fn launch_and_wait(
             );
         }
         LaunchTarget::MacAppBundle(bundle) => {
-            launcher::launch_macos_bundle(bundle, &working_directory, &base_url, &api_key)?;
+            launcher::launch_macos_bundle(
+                bundle,
+                &working_directory,
+                local_api
+                    .as_ref()
+                    .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
+            )?;
             return Err("Codex launched via app bundle; cannot wait for API readiness".into());
         }
     };
@@ -219,13 +249,19 @@ pub fn endpoint_reachable(config: &LauncherConfig) -> bool {
     let Ok(base_url) = config.openai_base_url() else {
         return false;
     };
-    let url = format!("{}/api/tags", base_url.trim_end_matches('/'));
-    endpoint_responds(&url, 2)
+    let Ok(url) = ollama::tags_url_from_base(&base_url) else {
+        return false;
+    };
+    endpoint_responds(
+        &url,
+        config.api_key_if_configured().as_deref(),
+        2,
+    )
 }
 
 pub fn codex_api_ready(config: &LauncherConfig) -> bool {
     let url = format!("{}/health", config.codex_api_base_url());
-    endpoint_responds(&url, 2)
+    endpoint_responds(&url, None, 2)
 }
 
 pub async fn start_session(
@@ -331,7 +367,7 @@ pub fn detect_codex_process(config: &LauncherConfig, root: &Path) -> CodexProces
     }
 
     let codex_health_url = format!("{}/health", config.codex_api_base_url());
-    if endpoint_responds(&codex_health_url, 2) {
+    if endpoint_responds(&codex_health_url, None, 2) {
         if let Some((pid, _method)) = detect_process_on_port(config.codex_api_port()) {
             return CodexProcessInfo {
                 running: true,
@@ -358,7 +394,7 @@ pub fn detect_codex_process(config: &LauncherConfig, root: &Path) -> CodexProces
 
 fn is_launcher_process_name(name: &str) -> bool {
     let lower = name.to_lowercase();
-    lower.contains("codex-local-launcher") || lower.contains("codex_local_launcher")
+    lower.contains("codex-launchpad") || lower.contains("codex_launchpad")
 }
 
 /// Detect if a Codex process is running by name (cross-platform).
@@ -556,10 +592,14 @@ fn is_process_running(pid: u32) -> bool {
 }
 
 /// Check if an endpoint responds to an HTTP request within timeout_secs
-fn endpoint_responds(url: &str, timeout_secs: u64) -> bool {
-    reqwest::blocking::Client::new()
+fn endpoint_responds(url: &str, api_key: Option<&str>, timeout_secs: u64) -> bool {
+    let mut request = reqwest::blocking::Client::new()
         .get(url)
-        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .timeout(std::time::Duration::from_secs(timeout_secs));
+    if let Some(api_key) = api_key.filter(|value| !value.trim().is_empty()) {
+        request = request.bearer_auth(api_key);
+    }
+    request
         .send()
         .map(|r| r.status().is_success())
         .unwrap_or(false)
@@ -688,6 +728,42 @@ pub fn kill_codex_by_pid_number(pid: u32) -> Result<String, Box<dyn Error>> {
             Err(e) => Err(format!("Could not run kill: {e}").into()),
         }
     }
+}
+
+pub fn inspect_codex_config(
+    config: &LauncherConfig,
+) -> Result<codex_config::CodexConfigInspection, Box<dyn Error>> {
+    Ok(codex_config::inspect(config)?)
+}
+
+/// Merge launcher settings with the live Codex profile on first launch.
+pub fn bootstrap_launcher_from_codex(
+    config: &mut LauncherConfig,
+    inspection: &codex_config::CodexConfigInspection,
+) -> Vec<String> {
+    let mut changes = Vec::new();
+
+    if config.codex_model().is_none() {
+        if let Some(model) = inspection.model.as_ref().filter(|m| !m.is_empty()) {
+            config.codex_model = Some(model.clone());
+            changes.push(format!("Adopted Codex model: {model}"));
+        }
+    }
+
+    if inspection.managed_by_launcher {
+        if let Some(base_url) = inspection.launcher_base_url.as_ref() {
+            if config.openai_base_url.is_none() && config.ollama_ip.is_none() {
+                config.openai_base_url = Some(base_url.clone());
+                changes.push(format!("Adopted Codex endpoint: {base_url}"));
+            }
+        }
+    }
+
+    changes
+}
+
+pub fn sync_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
+    write_config(config)
 }
 
 pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {

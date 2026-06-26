@@ -163,7 +163,7 @@ try {
         $headers["Authorization"] = "Bearer $([string]$config.apiKey)"
     }
 
-    Write-Host "=== Codex Local Launcher Diagnostic ==="
+    Write-Host "=== Codex Launcher Diagnostic ==="
 
     Write-Section "Configuration"
     Write-Host "Config path      : $ConfigPath"
@@ -188,8 +188,8 @@ try {
         Detail = $(if (Test-Path -LiteralPath $workingDirectory) { "" } else { "Missing path: $workingDirectory" })
     })
 
-    $releaseBinary = Join-Path $root "target\release\codex-local-launcher.exe"
-    $debugBinary = Join-Path $root "target\debug\codex-local-launcher.exe"
+    $releaseBinary = Join-Path $root "target\release\codex-launchpad.exe"
+    $debugBinary = Join-Path $root "target\debug\codex-launchpad.exe"
     $binaryPath = if (Test-Path -LiteralPath $releaseBinary) { $releaseBinary } elseif (Test-Path -LiteralPath $debugBinary) { $debugBinary } else { $null }
     Write-CheckResult ([pscustomobject]@{
         Name = "Launcher binary present"

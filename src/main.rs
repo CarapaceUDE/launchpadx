@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     if let Err(err) = dispatch() {
-        eprintln!("codex-local-launcher: {err}");
+        eprintln!("codex-launchpad: {err}");
         std::process::exit(1);
     }
 }
@@ -11,20 +11,20 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     if args.serve_only {
-        let root = codex_local_launcher::web_backend::resolve_gui_root();
+        let root = codex_launchpad::web_backend::resolve_gui_root();
         let config_path = args
             .config_path
             .unwrap_or_else(|| default_config_path(&root));
-        codex_local_launcher::web_backend::serve_web_ui(root, config_path, args.port)?;
+        codex_launchpad::web_backend::serve_web_ui(root, config_path, args.port)?;
         return Ok(());
     }
 
     if args.gui {
-        let root = codex_local_launcher::web_backend::resolve_gui_root();
+        let root = codex_launchpad::web_backend::resolve_gui_root();
         let config_path = args
             .config_path
             .unwrap_or_else(|| root.join("config.json"));
-        codex_local_launcher::web_backend::launch_web_gui(root, config_path)?;
+        codex_launchpad::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
     }
 
@@ -53,30 +53,30 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         .config_path
         .unwrap_or_else(|| default_config_path(&root));
 
-    let config = codex_local_launcher::config::LauncherConfig::read(&config_path)?;
-    let pid_file = codex_local_launcher::app_logic::codex_pid_file(&config_path);
+    let config = codex_launchpad::config::LauncherConfig::read(&config_path)?;
+    let pid_file = codex_launchpad::app_logic::codex_pid_file(&config_path);
 
     if args.restore {
-        println!("{}", codex_local_launcher::app_logic::restore(&config)?);
+        println!("{}", codex_launchpad::app_logic::restore(&config)?);
         return Ok(());
     }
 
     if args.refresh_models {
-        let cache = codex_local_launcher::app_logic::refresh_models(&config)?;
+        let cache = codex_launchpad::app_logic::refresh_models(&config)?;
         print_models(&cache);
         println!(
             "Model cache: {}",
-            codex_local_launcher::ollama::model_cache_path()?.display()
+            codex_launchpad::ollama::model_cache_path()?.display()
         );
         return Ok(());
     }
 
     if args.list_models {
-        let cache = codex_local_launcher::app_logic::list_models(&config)?;
+        let cache = codex_launchpad::app_logic::list_models(&config)?;
         print_models(&cache);
         println!(
             "Model cache: {}",
-            codex_local_launcher::ollama::model_cache_path()?.display()
+            codex_launchpad::ollama::model_cache_path()?.display()
         );
         return Ok(());
     }
@@ -84,25 +84,24 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     if args.write_config_only {
         println!(
             "{}",
-            codex_local_launcher::app_logic::write_config(&config)?
+            codex_launchpad::app_logic::write_config(&config)?
         );
         return Ok(());
     }
 
     if args.launch {
+        if let Some(message) = codex_launchpad::app_logic::write_config_for_launch(&config)? {
+            println!("{message}");
+        }
         println!(
             "{}",
-            codex_local_launcher::app_logic::write_config(&config)?
-        );
-        println!(
-            "{}",
-            codex_local_launcher::app_logic::launch(&config, &root, &pid_file)?
+            codex_launchpad::app_logic::launch(&config, &root, &pid_file)?
         );
         return Ok(());
     }
 
     if args.kill {
-        match codex_local_launcher::app_logic::kill_codex_by_pid(&pid_file) {
+        match codex_launchpad::app_logic::kill_codex_by_pid(&pid_file) {
             Ok(msg) => {
                 println!("{}", msg);
             }
@@ -115,13 +114,12 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Default: launch Codex
+    if let Some(message) = codex_launchpad::app_logic::write_config_for_launch(&config)? {
+        println!("{message}");
+    }
     println!(
         "{}",
-        codex_local_launcher::app_logic::write_config(&config)?
-    );
-    println!(
-        "{}",
-        codex_local_launcher::app_logic::launch(&config, &root, &pid_file)?
+        codex_launchpad::app_logic::launch(&config, &root, &pid_file)?
     );
     Ok(())
 }
@@ -136,16 +134,15 @@ async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         .config_path
         .unwrap_or_else(|| default_config_path(&root));
 
-    let config = codex_local_launcher::config::LauncherConfig::read(&config_path)?;
-    let pid_file = codex_local_launcher::app_logic::codex_pid_file(&config_path);
+    let config = codex_launchpad::config::LauncherConfig::read(&config_path)?;
+    let pid_file = codex_launchpad::app_logic::codex_pid_file(&config_path);
 
     if args.launch_wait {
-        println!(
-            "{}",
-            codex_local_launcher::app_logic::write_config(&config)?
-        );
+        if let Some(message) = codex_launchpad::app_logic::write_config_for_launch(&config)? {
+            println!("{message}");
+        }
         let process =
-            codex_local_launcher::app_logic::launch_and_wait(&config, &root, &pid_file).await?;
+            codex_launchpad::app_logic::launch_and_wait(&config, &root, &pid_file).await?;
         let state = process.health_check(5).await?;
         if state.api_ready {
             println!("Codex launched and API is ready!");
@@ -156,7 +153,7 @@ async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if args.health {
-        let state = codex_local_launcher::app_logic::health_check(&config).await?;
+        let state = codex_launchpad::app_logic::health_check(&config).await?;
         println!(
             "Codex API: {}",
             if state.api_ready {
@@ -169,21 +166,21 @@ async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(_session_id) = args.session_create {
-        let session = codex_local_launcher::app_logic::start_session(&config).await?;
+        let session = codex_launchpad::app_logic::start_session(&config).await?;
         println!("Session created: {}", session.session_id);
         return Ok(());
     }
 
     if let Some((session_id, msg)) = &args.session_send {
         let response =
-            codex_local_launcher::app_logic::send_message(&config, session_id, msg).await?;
+            codex_launchpad::app_logic::send_message(&config, session_id, msg).await?;
         println!("{}", response.content);
         return Ok(());
     }
 
     if let Some(session_id) = &args.session_response {
         let response =
-            codex_local_launcher::app_logic::get_response(&config, session_id).await?;
+            codex_launchpad::app_logic::get_response(&config, session_id).await?;
         println!("{}", response.content);
         return Ok(());
     }
@@ -191,7 +188,7 @@ async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(session_id) = &args.session_close {
         println!(
             "{}",
-            codex_local_launcher::app_logic::close_session(&config, session_id).await?
+            codex_launchpad::app_logic::close_session(&config, session_id).await?
         );
         return Ok(());
     }
@@ -199,7 +196,7 @@ async fn run_cli_async(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     if args.session_list {
         println!(
             "{}",
-            codex_local_launcher::app_logic::list_sessions(&config).await?
+            codex_launchpad::app_logic::list_sessions(&config).await?
         );
         return Ok(());
     }
@@ -217,10 +214,10 @@ fn default_config_path(root: &Path) -> PathBuf {
 }
 
 fn print_help() {
-    println!("Codex Local Launcher");
+    println!("{}", codex_launchpad::branding::APP_NAME);
     println!();
     println!("USAGE:");
-    println!("    codex-local-launcher [OPTIONS]");
+    println!("    codex-launchpad [OPTIONS]");
     println!();
     println!("OPTIONS:");
     println!("         --gui                      Open the GUI");
@@ -247,7 +244,7 @@ fn print_help() {
     println!("    Public defaults live in config.example.json.");
 }
 
-fn print_models(cache: &codex_local_launcher::ollama::ModelCache) {
+fn print_models(cache: &codex_launchpad::ollama::ModelCache) {
     println!("Ollama models from {}", cache.fetched_from);
     for model in &cache.models {
         println!("{}", model.name);

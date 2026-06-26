@@ -198,11 +198,11 @@ impl LauncherConfig {
     }
 
     pub fn codex_provider_id(&self) -> String {
-        non_empty(&self.codex_provider_id).unwrap_or_else(|| "codex-local-launcher".to_string())
+        non_empty(&self.codex_provider_id).unwrap_or_else(|| "codex-launchpad".to_string())
     }
 
     pub fn codex_provider_name(&self) -> String {
-        non_empty(&self.codex_provider_name).unwrap_or_else(|| "Codex Local Launcher".to_string())
+        non_empty(&self.codex_provider_name).unwrap_or_else(|| crate::branding::DEFAULT_PROVIDER_NAME.to_string())
     }
 
     pub fn codex_api_key_mode(&self) -> ApiKeyMode {

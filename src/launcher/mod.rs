@@ -62,15 +62,16 @@ pub fn launch_path(
     path: &Path,
     working_directory: &Path,
     args: &[String],
-    base_url: &str,
-    api_key: &str,
+    local_api: Option<(&str, &str)>,
 ) -> Result<(), LauncherError> {
     let mut command = Command::new(path);
-    command
-        .current_dir(working_directory)
-        .args(args)
-        .env("OPENAI_BASE_URL", base_url)
-        .env("OPENAI_API_KEY", api_key);
+    command.current_dir(working_directory).args(args);
+
+    if let Some((base_url, api_key)) = local_api {
+        command
+            .env("OPENAI_BASE_URL", base_url)
+            .env("OPENAI_API_KEY", api_key);
+    }
 
     command.spawn().map_err(|source| LauncherError::Launch {
         program: path.display().to_string(),
@@ -95,12 +96,11 @@ pub fn launch_windows_start_app(app_id: &str) -> Result<(), LauncherError> {
 pub fn launch_macos_bundle(
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] bundle: &Path,
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] working_directory: &Path,
-    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] base_url: &str,
-    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] api_key: &str,
+    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] local_api: Option<(&str, &str)>,
 ) -> Result<(), LauncherError> {
     #[cfg(target_os = "macos")]
     {
-        return macos::launch_bundle(bundle, working_directory, base_url, api_key);
+        return macos::launch_bundle(bundle, working_directory, local_api);
     }
 
     #[allow(unreachable_code)]

@@ -85,7 +85,7 @@ export function LogsPanel() {
 
       <div
         ref={containerRef}
-        className="max-h-[250px] space-y-1 overflow-y-auto pr-1 font-mono text-[11px]"
+        className="themed-scrollbar max-h-[250px] space-y-1 overflow-y-auto pr-1 font-mono text-[11px]"
       >
         {logs.length === 0 ? (
           <p className="py-6 text-center italic text-muted-foreground/50">No log entries available.</p>

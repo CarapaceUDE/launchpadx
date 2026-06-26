@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 . (Join-Path $root "scripts\lib.ps1")
 
-$binPath = Join-Path $root "target\release\codex-local-launcher.exe"
+$binPath = Join-Path $root "target\release\codex-launchpad.exe"
 $srcFiles = Get-ChildItem -Recurse -File (Join-Path $root "src") -ErrorAction SilentlyContinue
 $rustNeedsBuild = $false
 
@@ -30,7 +30,7 @@ if ($rustNeedsBuild) {
         exit 1
     }
 
-    & $cargo build --release --bin codex-local-launcher
+    & $cargo build --release --bin codex-launchpad
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: Rust build failed!" -ForegroundColor Red
         exit 1

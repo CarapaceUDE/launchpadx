@@ -67,19 +67,22 @@ impl CodexProcess {
         codex_command: &str,
         working_directory: &PathBuf,
         codex_args: &[String],
-        base_url: &str,
-        api_key: &str,
+        local_api: Option<(&str, &str)>,
         pid_file: &std::path::Path,
     ) -> Result<Self, Box<dyn Error>> {
         let mut command = Command::new(codex_command);
         command
             .current_dir(working_directory)
             .args(codex_args)
-            .env("OPENAI_BASE_URL", base_url)
-            .env("OPENAI_API_KEY", api_key)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
+
+        if let Some((base_url, api_key)) = local_api {
+            command
+                .env("OPENAI_BASE_URL", base_url)
+                .env("OPENAI_API_KEY", api_key);
+        }
 
         // Create a detached process so it survives the parent exiting
         #[cfg(target_os = "windows")]
@@ -99,7 +102,9 @@ impl CodexProcess {
 
         Ok(Self {
             handle: Some(child),
-            base_url: base_url.to_string(),
+            base_url: local_api
+                .map(|(base_url, _)| base_url.to_string())
+                .unwrap_or_default(),
             pid_file: Some(pid_file.to_path_buf()),
         })
     }

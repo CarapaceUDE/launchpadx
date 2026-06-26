@@ -1,11 +1,11 @@
-# Codex Local Launcher – Agent Instructions
+# Codex Launcher ï¿½ Agent Instructions
 
 ## Project Overview
 
 Rust GUI/CLI application with a React + Vite web UI. The Rust code provides:
-- **GUI binary** (`codex-local-launcher --gui`) – runs a Tauri-like webview app using `wry`/`tao`
-- **CLI binary** (`codex-local-launcher`) – headless: discover models, apply Codex config, refresh model cache
-- **Embedded HTTP server** (`web_backend.rs`) – serves the web UI and exposes `/api/tags` etc.
+- **GUI binary** (`codex-launchpad --gui`) ï¿½ runs a Tauri-like webview app using `wry`/`tao`
+- **CLI binary** (`codex-launchpad`) ï¿½ headless: discover models, apply Codex config, refresh model cache
+- **Embedded HTTP server** (`web_backend.rs`) ï¿½ serves the web UI and exposes `/api/tags` etc.
 
 The web UI is a standalone Vite + React + Tailwind app that gets bundled and embedded into the Rust binary.
 
@@ -23,7 +23,7 @@ The web UI is a standalone Vite + React + Tailwind app that gets bundled and emb
 ```powershell
 cargo build                    # Debug build
 cargo build --release          # Release build
-cargo build --release --bin codex-local-launcher  # Specific binary
+cargo build --release --bin codex-launchpad  # Specific binary
 cd web && npm run build        # Build web UI only
 ```
 

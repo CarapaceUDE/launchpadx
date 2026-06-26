@@ -30,7 +30,7 @@ export default function Sidebar({
 
     return (
         <aside className="sidebar">
-            <div className="sidebar-brand">Codex Local Launcher</div>
+            <div className="sidebar-brand">Codex Launcher</div>
             <nav className="sidebar-nav">
                 {navItems.map((item) => (
                     <button

@@ -1,3 +1,4 @@
+import type { CodexConfigInspection } from "./codexProfile";
 import type { LauncherConfig, CodexProcessInfo } from "../types";
 
 export interface LauncherResponse<T> {
@@ -13,7 +14,9 @@ interface LogEntry {
 
 export interface CodexRpcClient {
   call<T>(method: string, params?: Record<string, unknown>): Promise<LauncherResponse<T>>;
-  launch(): Promise<LauncherResponse<{ ok?: boolean; pid?: number; message?: string }>>;
+  launch(
+    cfg?: LauncherConfig,
+  ): Promise<LauncherResponse<{ ok?: boolean; pid?: number; message?: string }>>;
   stop(): Promise<LauncherResponse<{ ok?: boolean; message?: string }>>;
   saveConfig(cfg: LauncherConfig): Promise<LauncherResponse<{ ok?: boolean; message?: string }>>;
   loadConfig(): Promise<LauncherResponse<LauncherConfig>>;
@@ -42,13 +45,22 @@ export interface CodexRpcClient {
       fetchedFrom?: string;
     }>
   >;
-  writeCodexConfig(): Promise<LauncherResponse<{ message?: string }>>;
-  revertCodexConfig(): Promise<LauncherResponse<{ message?: string }>>;
+  writeCodexConfig(
+    cfg?: LauncherConfig,
+  ): Promise<LauncherResponse<{ message?: string; inspection?: CodexConfigInspection }>>;
+  syncCodexConfig(
+    cfg?: LauncherConfig,
+  ): Promise<LauncherResponse<{ message?: string; inspection?: CodexConfigInspection }>>;
+  inspectCodexConfig(): Promise<LauncherResponse<CodexConfigInspection>>;
+  revertCodexConfig(
+    cfg?: LauncherConfig,
+  ): Promise<LauncherResponse<{ message?: string; inspection?: CodexConfigInspection }>>;
   detectCodex(): Promise<LauncherResponse<CodexProcessInfo>>;
   killCodexByPid(pid: number): Promise<LauncherResponse<{ message?: string }>>;
   getAppLogs(): Promise<LauncherResponse<{ logs: LogEntry[] }>>;
   saveSettings(settings: Record<string, unknown>): Promise<LauncherResponse<{ message?: string }>>;
   toggleAutoStart(): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
+  setAutoStart(enabled: boolean): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
 }
 
 export function createCodexRpcClient(): CodexRpcClient {
@@ -71,20 +83,26 @@ export function createCodexRpcClient(): CodexRpcClient {
 
   return {
     call,
-    launch: () => call("launch"),
+    launch: (cfg) => call("launch", (cfg ?? {}) as unknown as Record<string, unknown>),
     stop: () => call("stop"),
     saveConfig: (cfg) => call("saveConfig", cfg as unknown as Record<string, unknown>),
     loadConfig: () => call("loadConfig"),
     healthCheck: (cfg) => call("healthCheck", (cfg ?? {}) as unknown as Record<string, unknown>),
     listModels: () => call("listModels"),
     refreshModels: (cfg) => call("refreshModels", (cfg ?? {}) as unknown as Record<string, unknown>),
-    writeCodexConfig: () => call("writeCodexConfig"),
-    revertCodexConfig: () => call("revertCodexConfig"),
+    writeCodexConfig: (cfg) =>
+      call("writeCodexConfig", (cfg ?? {}) as unknown as Record<string, unknown>),
+    syncCodexConfig: (cfg) =>
+      call("syncCodexConfig", (cfg ?? {}) as unknown as Record<string, unknown>),
+    inspectCodexConfig: () => call("inspectCodexConfig"),
+    revertCodexConfig: (cfg) =>
+      call("revertCodexConfig", (cfg ?? {}) as unknown as Record<string, unknown>),
     detectCodex: () => call("detectCodex"),
     killCodexByPid: (pid) => call("killCodexByPid", { pid }),
     getAppLogs: () => call("getAppLogs"),
     saveSettings: (settings) => call("saveSettings", settings),
     toggleAutoStart: () => call("toggleAutoStart"),
+    setAutoStart: (enabled) => call("setAutoStart", { enabled }),
   };
 }
 
