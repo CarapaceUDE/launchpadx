@@ -75,7 +75,7 @@ if ($webNeedsBuild) {
     Write-Host "Web UI is up to date." -ForegroundColor Gray
 }
 
-# === Stage web/dist next to the release binary ===
+# === Stage web/dist and assets next to the release binary ===
 $releaseDir = Join-Path $root "target\release"
 $stageDist = Join-Path $releaseDir "web\dist"
 if (Test-Path $distDir) {
@@ -85,6 +85,16 @@ if (Test-Path $distDir) {
     New-Item -ItemType Directory -Path (Split-Path $stageDist -Parent) -Force | Out-Null
     Copy-Item $distDir $stageDist -Recurse -Force
     Write-Host "Staged web UI to $stageDist" -ForegroundColor Gray
+}
+
+$assetsDir = Join-Path $root "assets"
+$stageAssets = Join-Path $releaseDir "assets"
+if (Test-Path $assetsDir) {
+    if (Test-Path $stageAssets) {
+        Remove-Item $stageAssets -Recurse -Force
+    }
+    Copy-Item $assetsDir $stageAssets -Recurse -Force
+    Write-Host "Staged assets to $stageAssets" -ForegroundColor Gray
 }
 
 $configSrc = Join-Path $root "config.json"

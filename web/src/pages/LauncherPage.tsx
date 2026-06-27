@@ -17,6 +17,7 @@ import { buildOpenAiBaseUrl } from "../lib/endpoint";
 import { reconcileModelSelection } from "../lib/modelSelection";
 import { activeProviderMode, type ProviderMode } from "../lib/codexProfile";
 import { canStartCodex, localActivationRequirements } from "../lib/providerGuards";
+import { APP_NAME } from "../lib/branding";
 
 export function LauncherPage() {
   const {
@@ -148,7 +149,7 @@ export function LauncherPage() {
           {activeNav === "launcher" ? (
             <div className="space-y-5">
               <header className="mb-1" data-testid="page-launcher">
-                <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Launcher</h1>
+                <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{APP_NAME}</h1>
                 <p className="text-[13px] text-muted-foreground">
                   Configure Codex, pick a model provider, and run Codex from one place.
                 </p>

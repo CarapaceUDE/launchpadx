@@ -10,7 +10,7 @@ test.describe("Codex Launchpad", () => {
   });
 
   test("loads the launcher shell", async ({ page }) => {
-    await expect(page.getByRole("heading", { name: "Launcher" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Codex Launchpad" })).toBeVisible();
     await expect(page.getByTestId("provider-mode-card")).toBeVisible();
     await expect(page.getByTestId("provider-mode-codex")).toBeVisible();
     await expect(page.getByTestId("provider-mode-local")).toBeVisible();

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/icon.png" alt="Codex Launchpad" width="88" height="88" />
+<img src="assets/logo.png" alt="Codex Launchpad" width="360" />
 
 # Codex Launchpad
 

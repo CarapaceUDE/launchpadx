@@ -11,6 +11,7 @@ fn main() {
     println!("cargo:rerun-if-changed=web/package.json");
     println!("cargo:rerun-if-changed=web/package-lock.json");
     println!("cargo:rerun-if-changed=web/vite.config.ts");
+    println!("cargo:rerun-if-changed=assets/icon.png");
 
     let cargo_manifest_dir = env!("CARGO_MANIFEST_DIR");
     let web_dir = Path::new(cargo_manifest_dir).join("web");

@@ -33,6 +33,7 @@ import {
   shouldSyncCodexToDisk,
 } from "../lib/providerGuards";
 import type { ServerPillState } from "../components/launcher/primitives";
+import { APP_NAME } from "../lib/branding";
 
 export type NavKey = "launcher" | "models" | "settings" | "logs" | "about";
 
@@ -130,7 +131,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LauncherState>({
     running: false,
     apiReady: false,
-    statusMessage: "Starting launcher...",
+    statusMessage: `Starting ${APP_NAME}...`,
     statusVariant: "default",
     operation: "initializing",
     serverState: "stopped",

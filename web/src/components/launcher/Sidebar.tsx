@@ -4,7 +4,7 @@ import type { NavKey } from "../../context/LauncherContext";
 import { APP_NAME, LICENSE_NOTICE, LICENSE_URL } from "../../lib/branding";
 
 const items: { key: NavKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: "launcher", label: "Launcher", icon: Rocket },
+  { key: "launcher", label: "Launchpad", icon: Rocket },
   { key: "models", label: "Models", icon: Boxes },
   { key: "settings", label: "Settings", icon: Settings },
   { key: "logs", label: "Logs", icon: FileText },
@@ -41,7 +41,7 @@ export function Sidebar({
               <div className="text-[15px] font-semibold leading-tight tracking-tight text-white">
                 Codex
               </div>
-              <div className="text-[12px] leading-tight text-white/70">Launcher</div>
+              <div className="text-[12px] leading-tight text-white/70">Launchpad</div>
             </div>
           </div>
         </div>

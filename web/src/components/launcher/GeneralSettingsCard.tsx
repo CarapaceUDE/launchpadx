@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SlidersHorizontal, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Card, FormField, TextInput, ToggleRow } from "./primitives";
 import type { CodexConfigForm } from "../../context/LauncherContext";
+import { APP_NAME } from "../../lib/branding";
 
 export function GeneralSettingsCard({
   autoStart,
@@ -72,7 +73,7 @@ export function GeneralSettingsCard({
             <p className="mt-1.5 text-[12px] text-warning-fg">{apiKeyWarning}</p>
           )}
           <p className="mt-1.5 text-[12px] text-muted-foreground">
-            Stored locally in <code>config.json</code>. The launcher redacts this value in diagnostics and logs.
+            Stored locally in <code>config.json</code>. {APP_NAME} redacts this value in diagnostics and logs.
           </p>
         </FormField>
 

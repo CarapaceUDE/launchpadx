@@ -20,6 +20,7 @@ pub struct RpcState {
 
 const ICON_FILENAME: &str = "icon.ico";
 const ICON_PNG: &str = "icon.png";
+const EMBEDDED_ICON_PNG: &[u8] = include_bytes!("../assets/icon.png");
 const DIST_DIR: &str = "web/dist";
 const DIST_INDEX: &str = "web/dist/index.html";
 const EMBEDDED_LICENSE: &str = include_str!("../LICENSE");
@@ -72,21 +73,52 @@ pub fn resolve_gui_root() -> PathBuf {
     fallback
 }
 
-fn resolve_icon_path(root: &Path) -> PathBuf {
-    let candidates = [
+fn icon_candidates_for(root: &Path) -> Vec<PathBuf> {
+    vec![
         root.join("assets").join(ICON_FILENAME),
         root.join("assets").join(ICON_PNG),
         root.join(ICON_FILENAME),
         root.join(ICON_PNG),
-        root.join("..").join("assets").join(ICON_FILENAME),
-        root.join("..").join("assets").join(ICON_PNG),
-    ];
-    for candidate in &candidates {
-        if candidate.exists() {
-            return candidate.to_path_buf();
+    ]
+}
+
+fn resolve_icon_path(root: &Path) -> Option<PathBuf> {
+    let mut dir = Some(root.to_path_buf());
+    for _ in 0..8 {
+        let Some(ref current) = dir else {
+            break;
+        };
+        for candidate in icon_candidates_for(current) {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        dir = current.parent().map(|p| p.to_path_buf());
+    }
+    None
+}
+
+fn load_app_icon(root: &Path) -> Option<tao::window::Icon> {
+    if let Some(icon_path) = resolve_icon_path(root) {
+        if let Ok(icon_data) = std::fs::read(&icon_path) {
+            if let Some(icon) = load_icon(&icon_data) {
+                return Some(icon);
+            }
+            gui_log!(
+                Some(root),
+                "WARN",
+                "Failed to decode icon at {}",
+                icon_path.display()
+            );
         }
     }
-    root.join("assets").join(ICON_PNG)
+
+    gui_log!(
+        Some(root),
+        "INFO",
+        "Using embedded app icon fallback"
+    );
+    load_icon(EMBEDDED_ICON_PNG)
 }
 
 fn load_icon(data: &[u8]) -> Option<tao::window::Icon> {
@@ -339,22 +371,15 @@ pub fn launch_web_gui(
     let event_loop = EventLoop::new();
     gui_log!(Some(root.as_path()), "INFO", "Event loop created");
 
-    // Load icon - try ICO first, fallback to PNG
-    let icon_path = resolve_icon_path(&root);
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "Icon path: {}",
-        icon_path.display()
-    );
-    let icon_data = std::fs::read(&icon_path).unwrap_or_default();
-    let icon = if icon_data.is_empty() {
-        gui_log!(Some(root.as_path()), "WARN", "No icon found");
-        None
-    } else {
-        gui_log!(Some(root.as_path()), "INFO", "Loading icon");
-        load_icon(&icon_data)
-    };
+    let icon = load_app_icon(root.as_path());
+    if let Some(icon_path) = resolve_icon_path(&root) {
+        gui_log!(
+            Some(root.as_path()),
+            "INFO",
+            "Icon path: {}",
+            icon_path.display()
+        );
+    }
     gui_log!(
         Some(root.as_path()),
         "INFO",
@@ -962,7 +987,20 @@ fn handle_request(dist_dir: &Path, state: &Arc<Mutex<RpcState>>, mut request: ti
 
 #[cfg(test)]
 mod tests {
-    use super::redact_sensitive_text;
+    use super::{load_icon, redact_sensitive_text, resolve_icon_path, EMBEDDED_ICON_PNG};
+    use std::path::PathBuf;
+
+    #[test]
+    fn embedded_app_icon_decodes() {
+        assert!(load_icon(EMBEDDED_ICON_PNG).is_some());
+    }
+
+    #[test]
+    fn resolve_icon_path_finds_repo_asset() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let icon_path = resolve_icon_path(&root).expect("repo icon.png should resolve");
+        assert!(icon_path.ends_with("assets/icon.png"));
+    }
 
     #[test]
     fn redacts_json_api_keys() {
