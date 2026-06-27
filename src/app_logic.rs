@@ -515,19 +515,19 @@ fn detect_codex_by_name() -> Option<CodexProcessInfo> {
                     });
                 }
             }
-        }
-        for line in stdout.lines() {
-            if !line.to_lowercase().contains("codex") || is_launcher_process_name(line) {
-                continue;
-            }
-            let pid_str = line.split_whitespace().next()?;
-            if let Ok(pid) = pid_str.parse::<u32>() {
-                return Some(CodexProcessInfo {
-                    running: true,
-                    pid: Some(pid),
-                    method: Some("process_name".to_string()),
-                    restart_required: true,
-                });
+            for line in stdout.lines() {
+                if !line.to_lowercase().contains("codex") || is_launcher_process_name(line) {
+                    continue;
+                }
+                let pid_str = line.split_whitespace().next()?;
+                if let Ok(pid) = pid_str.parse::<u32>() {
+                    return Some(CodexProcessInfo {
+                        running: true,
+                        pid: Some(pid),
+                        method: Some("process_name".to_string()),
+                        restart_required: true,
+                    });
+                }
             }
         }
     }
