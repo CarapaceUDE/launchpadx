@@ -57,6 +57,8 @@
 
 During this phase, that split is intentional—it doubles as an early-access filter. While things are still rough, we'd rather surface bugs through people who build from source and are comfortable debugging setup: developer-minded early testers who file useful issues and contribute fixes. That keeps us learning from actionable feedback instead of drowning in "it just broke" reports from users who downloaded a binary and expected polish on day one. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
 
+Whether you build from source or support us on Patreon, we're happy to offer **limited community support** on our [Discord server](https://carapaceai.org/discord) — setup questions, build trouble, and bug reports are welcome there.
+
 ---
 
 ## Prerequisites
@@ -214,6 +216,8 @@ Cross-platform logic lives in the Rust binary and `build.rs`. These wrappers are
 | `run-gui.cmd` | Windows | Build if stale, then `codex-launchpad --gui` |
 | `test.cmd` | Windows | `cargo fmt --check`, `cargo test`, `cargo clippy` |
 | `diagnose.sh` / `diagnose.ps1` | All (thin wrappers) | Run `codex-launchpad --diagnose` |
+
+Stuck on a build or platform-specific dependency? Run `codex-launchpad --diagnose` first, then ask on [Discord](https://carapaceai.org/discord) — we provide limited community support there and are glad to help when we can.
 
 ## Testing
 
