@@ -2,6 +2,10 @@ name: Build Official Binaries
 
 # Private build artifacts for Patreon distribution.
 # Does NOT attach binaries to the public GitHub Release.
+concurrency:
+  group: official-binaries-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -128,4 +132,4 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}-${{ matrix.target }}
           path: ${{ steps.artifact.outputs.file }}
-          retention-days: 90
+          retention-days: 14
