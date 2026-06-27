@@ -1,4 +1,5 @@
-import { Github, Globe, Heart, MessageCircle, Rocket } from "lucide-react";
+import { Github, Globe, Heart, MessageCircle } from "lucide-react";
+import { AppIcon } from "./AppIcon";
 import {
   APP_NAME,
   LICENSE_NOTICE,
@@ -16,8 +17,8 @@ export function AboutPanel() {
     <div className="card-surface p-6">
       <div className="space-y-4 text-center">
         <div className="mb-3 flex items-center justify-center">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-            <Rocket className="h-6 w-6 text-primary" />
+          <div className="h-12 w-12 overflow-hidden rounded-xl ring-1 ring-primary/20">
+            <AppIcon size={48} className="h-full w-full" />
           </div>
         </div>
         <h3 className="text-[16px] font-semibold text-foreground">{APP_NAME}</h3>

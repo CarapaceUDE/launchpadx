@@ -14,7 +14,9 @@ pub fn resolve() -> Result<LaunchTarget, LauncherError> {
         return Ok(LaunchTarget::MacAppBundle(bundle));
     }
 
-    Err(LauncherError::CodexNotFound)
+    Err(LauncherError::CodexNotFound(
+        "searched PATH and /Applications/Codex.app".to_string(),
+    ))
 }
 
 fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError> {

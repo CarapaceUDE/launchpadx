@@ -13,9 +13,9 @@ The web UI is a standalone Vite + React + Tailwind app that gets bundled and emb
 
 - **Rust**: `cargo build --release --bin codex-launchpad`
 - **Web UI**: `cd web && npm run build` (Vite → `web/dist/`)
-- **Build script**: `build.rs` auto-runs `npm run build` if `web/dist/index.html` is missing
-- **Build checker**: `build-check.ps1` checks timestamps and rebuilds only what's stale
-- **Full build**: `build.cmd` → `scripts\build.ps1` → `cargo build --bins`
+- **Build script**: `build.rs` auto-runs `npm ci` + `npm run build` if needed (all OSes)
+- **Build checker**: `codex-launchpad --build-check` (or `build-check.sh` / `build-check.ps1` wrappers)
+- **Full build**: `cargo build --release`, or `./build.sh` / `build.cmd` → `scripts\build.ps1`
 - **Tests**: `test.cmd` → `cargo fmt -- --check && cargo test && cargo clippy --all-targets -- -D warnings`
 
 ### Common build commands
@@ -76,7 +76,7 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 
 ### Changing the build system
 1. Edit `build.rs` for Cargo-level automation
-2. Edit `build-check.ps1` for smart timestamp-based rebuilding
+2. Edit `src/build_check.rs` for smart timestamp-based rebuilding
 3. Run `build.cmd` to verify the full build pipeline works
 
 ## File Map
@@ -96,6 +96,8 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 | `scripts/run-cli.ps1` | CLI launch script |
 | `scripts/refresh-models.ps1` | Refresh model cache |
 | `scripts/restore.ps1` | Restore Codex config |
-| `build-check.ps1` | Smart build checker |
+| `codex-launchpad --build-check` | Smart incremental build + staging |
+| `build-check.sh` / `build-check.ps1` | Thin wrappers around `--build-check` |
 | `launch-codex.ps1` | Standalone Codex launcher |
-| `diagnose.ps1` | Health check diagnostic |
+| `codex-launchpad --diagnose` | Cross-platform health check |
+| `diagnose.sh` / `diagnose.ps1` | Thin wrappers around `--diagnose` |

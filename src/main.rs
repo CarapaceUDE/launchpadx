@@ -31,6 +31,21 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    if args.diagnose {
+        let root = std::env::current_dir()?;
+        let config_path = args
+            .config_path
+            .unwrap_or_else(|| default_config_path(&root));
+        codex_launchpad::diagnose::run(&config_path, &root)?;
+        return Ok(());
+    }
+
+    if args.build_check {
+        let root = std::env::current_dir()?;
+        codex_launchpad::build_check::run(&root)?;
+        return Ok(());
+    }
+
     if args.needs_async() {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -46,6 +61,19 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
         .unwrap_or(std::env::current_dir()?);
+
+    if !args.has_explicit_action() {
+        print_help();
+        return Ok(());
+    }
+
+    if !args.unknown_args.is_empty() {
+        return Err(format!(
+            "unrecognized argument(s): {}; pass --help to see available commands",
+            args.unknown_args.join(", ")
+        )
+        .into());
+    }
 
     let config_path = args
         .config_path
@@ -108,14 +136,7 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // Default: launch Codex
-    if let Some(message) = codex_launchpad::app_logic::write_config_for_launch(&config)? {
-        println!("{message}");
-    }
-    println!(
-        "{}",
-        codex_launchpad::app_logic::launch(&config, &root, &pid_file)?
-    );
+    print_help();
     Ok(())
 }
 
@@ -225,6 +246,8 @@ fn print_help() {
     println!("         --launch-wait             Launch Codex and wait for API readiness");
     println!("         --kill                    Kill the running Codex process");
     println!("         --health                  Check if Codex API is ready");
+    println!("         --diagnose                Run setup and connectivity checks");
+    println!("         --build-check             Rebuild stale Rust/web artifacts and stage release output");
     println!("         --session-create          Create a new ACP session");
     println!("         --session-send <id> <msg> Send a message to a session");
     println!("         --session-response <id>   Read response from a session");
@@ -258,11 +281,14 @@ struct Args {
     launch_wait: bool,
     kill: bool,
     health: bool,
+    diagnose: bool,
+    build_check: bool,
     session_create: Option<String>,
     session_send: Option<(String, String)>,
     session_response: Option<String>,
     session_close: Option<String>,
     session_list: bool,
+    unknown_args: Vec<String>,
 }
 
 impl Args {
@@ -311,6 +337,12 @@ impl Args {
             } else if arg == "--health" {
                 parsed.health = true;
                 i += 1;
+            } else if arg == "--diagnose" {
+                parsed.diagnose = true;
+                i += 1;
+            } else if arg == "--build-check" {
+                parsed.build_check = true;
+                i += 1;
             } else if arg == "--session-create" {
                 parsed.session_create = Some(
                     raw_args
@@ -344,7 +376,10 @@ impl Args {
             } else if arg == "--session-list" {
                 parsed.session_list = true;
                 i += 1;
+            } else if arg == "-h" || arg == "--help" {
+                i += 1;
             } else {
+                parsed.unknown_args.push(arg.clone());
                 i += 1;
             }
         }
@@ -354,6 +389,26 @@ impl Args {
     fn needs_async(&self) -> bool {
         self.launch_wait
             || self.health
+            || self.session_create.is_some()
+            || self.session_send.is_some()
+            || self.session_response.is_some()
+            || self.session_close.is_some()
+            || self.session_list
+    }
+
+    fn has_explicit_action(&self) -> bool {
+        !self.unknown_args.is_empty()
+            || self.config_path.is_some()
+            || self.write_config_only
+            || self.restore
+            || self.refresh_models
+            || self.list_models
+            || self.launch
+            || self.launch_wait
+            || self.kill
+            || self.health
+            || self.diagnose
+            || self.build_check
             || self.session_create.is_some()
             || self.session_send.is_some()
             || self.session_response.is_some()
@@ -380,6 +435,8 @@ mod tests {
         assert!(!args.launch_wait);
         assert!(!args.kill);
         assert!(!args.health);
+        assert!(!args.diagnose);
+        assert!(!args.build_check);
         assert!(args.session_create.is_none());
         assert!(args.session_send.is_none());
         assert!(args.session_response.is_none());

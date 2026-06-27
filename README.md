@@ -6,12 +6,12 @@
 
 **Point [Codex](https://github.com/openai/codex) at any OpenAI-compatible API and manage providers, models, and launch settings from one desktop app.**
 
-[![CI](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml/badge.svg?style=for-the-badge)](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
-[![Official builds](https://img.shields.io/badge/Official%20builds-Patreon-f96854?style=for-the-badge&logo=patreon&logoColor=white)](https://carapaceai.org/patreon)
-[![Rust](https://img.shields.io/badge/Rust-1.75+-f97316?style=for-the-badge&logo=rust&logoColor=white)](https://rustup.rs/)
-[![React](https://img.shields.io/badge/UI-React-61dafb?style=for-the-badge&logo=react&logoColor=black)](web/)
-[![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-2563eb?style=for-the-badge)]()
+[![CI](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml/badge.svg)](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=plastic&labelColor=555555)](LICENSE)
+[![Official builds](https://img.shields.io/badge/Official%20builds-Patreon-f96854?style=plastic&labelColor=555555&logo=patreon&logoColor=white)](https://carapaceai.org/patreon)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-f97316?style=plastic&labelColor=555555&logo=rust&logoColor=white)](https://rustup.rs/)
+[![React](https://img.shields.io/badge/UI-React-61dafb?style=plastic&labelColor=555555&logo=react&logoColor=black)](web/)
+[![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-2563eb?style=plastic&labelColor=555555)]()
 
 [**Website**](https://carapaceai.org) · [**Patreon — official builds**](https://carapaceai.org/patreon) · [**Discord**](https://carapaceai.org/discord) · [**Issues**](https://github.com/CarapaceUDE/codex-launchpad/issues)
 
@@ -62,7 +62,7 @@ During this phase, that split is intentional—it doubles as an early-access fil
 ## Prerequisites
 
 - **Rust / Cargo** — `rustc` 1.75+ (install via [rustup](https://rustup.rs/))
-- **Node.js** 18+ (for the web UI)
+- **Node.js** 18+ and **npm** (for the web UI — run `cd web && npm ci` once after cloning; `build.rs` installs web dependencies automatically when `web/node_modules` is missing on any OS)
 - **Codex CLI or Desktop App** — installed and discoverable on PATH (or set `codexCommand` in config)
 - An **OpenAI-compatible API** reachable from your machine (local server, LAN host, or remote gateway)
 
@@ -95,7 +95,7 @@ The project targets **Windows, macOS, and Linux**. You can build on any of them 
    ./target/release/codex-launchpad --gui
    ```
 
-   On Windows the binary is `target\release\codex-launchpad.exe`. If `web/dist/` is missing, `cargo build` will try to run `npm run build` for you via `build.rs`.
+   On Windows the binary is `target\release\codex-launchpad.exe`. If `web/dist/` is missing, `cargo build` runs `npm ci` (when `web/node_modules` is absent) and then `npm run build` via `build.rs`. You can still run `cd web && npm ci` yourself first — that is the most reliable path on a fresh clone.
 
    **Windows shortcut:** `.\run-gui.cmd` runs a stale-build check and launches the release GUI — convenience only, not required.
 
@@ -131,6 +131,7 @@ codex-launchpad --list-models             # print cached models
 codex-launchpad --write-config-only       # write ~/.codex/config.toml only
 codex-launchpad --launch                  # apply config and launch Codex
 codex-launchpad --restore                 # restore previous Codex settings
+codex-launchpad --diagnose                # setup and connectivity checks
 codex-launchpad --help                    # full flag list
 ```
 
@@ -179,7 +180,15 @@ cd web && npm ci && npm run build
 cargo build --release
 ```
 
-`build.rs` runs `npm run build` automatically during `cargo build` if `web/dist/index.html` is missing.
+`build.rs` runs `npm ci` (or `npm install` when no lockfile) when `web/node_modules` is missing, then runs `npm run build` during `cargo build` if `web/dist/index.html` is missing. This works on Windows, macOS, and Linux — no PowerShell required.
+
+Optional shell wrappers mirror the same steps:
+
+| Script | Platform | Purpose |
+| ------ | -------- | ------- |
+| `scripts/build.sh` / `./build.sh` | macOS, Linux, Git Bash | `npm ci` + web build + `cargo build --bins` |
+| `codex-launchpad --build-check` | All platforms | Timestamp-based incremental rebuild + staging |
+| `build-check.sh` / `build-check.ps1` | All (thin wrappers) | Run `--build-check` |
 
 ### Cross-compilation
 
@@ -192,17 +201,19 @@ cargo build --release --target aarch64-unknown-linux-gnu
 
 Output: `target/<triple>/release/codex-launchpad`. You need the appropriate linker and sysroot for the destination OS. The [Build Official Binaries](.github/workflows/build-official-binaries.yml) workflow shows the target triples we ship (Windows, macOS x86_64/arm64, Linux x86_64/arm64).
 
-### Windows-only convenience scripts
+### Optional convenience scripts
 
-These wrap the same `cargo` / `npm` steps for local Windows development — they are not required on macOS or Linux:
+Cross-platform logic lives in the Rust binary and `build.rs`. These wrappers are shortcuts only:
 
-| Script | Purpose |
-| ------ | ------- |
-| `build.cmd` / `scripts/build.ps1` | `cargo build --bins` |
-| `build-check.ps1` | Timestamp-based incremental rebuild (used by `run-gui.cmd`) |
-| `run-gui.cmd` | Build if stale, then `codex-launchpad --gui` |
-| `test.cmd` | `cargo fmt --check`, `cargo test`, `cargo clippy` |
-| `diagnose.ps1` | Health-check RPC, API connectivity, model discovery |
+| Script | Platform | Purpose |
+| ------ | -------- | ------- |
+| `build.sh` / `scripts/build.sh` | Unix, Git Bash | Full build (web + Rust) |
+| `codex-launchpad --build-check` | All platforms | Incremental rebuild + staging |
+| `build-check.sh` / `build-check.ps1` | All (thin wrappers) | Run `--build-check` |
+| `build.cmd` / `scripts/build.ps1` | Windows | `cargo build --bins` |
+| `run-gui.cmd` | Windows | Build if stale, then `codex-launchpad --gui` |
+| `test.cmd` | Windows | `cargo fmt --check`, `cargo test`, `cargo clippy` |
+| `diagnose.sh` / `diagnose.ps1` | All (thin wrappers) | Run `codex-launchpad --diagnose` |
 
 ## Testing
 
@@ -219,11 +230,12 @@ On Windows, `.\test.cmd` runs the same three commands.
 ## Diagnostics
 
 ```sh
+codex-launchpad --diagnose                # config, Codex launch probe, endpoint + API checks
 codex-launchpad --health
 codex-launchpad --list-models
 ```
 
-On Windows, `.\diagnose.ps1` runs a fuller connectivity check (launchpad RPC, API reachability, model discovery).
+`./diagnose.sh` and `.\diagnose.ps1` are thin wrappers around `--diagnose` (they run the built binary, or `cargo run` if you have not built yet).
 
 ## Security
 
@@ -251,17 +263,21 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 │   ├── src/              # React components & pages
 │   ├── dist/             # Built output (gitignored)
 │   └── package.json      # Frontend deps
-├── scripts/              # Windows PowerShell helpers (optional)
-│   ├── lib.ps1           # Shared helpers (Get-CargoCommand)
-│   ├── run-gui.ps1       # GUI run script
-│   ├── run-cli.ps1       # CLI run script
+├── scripts/              # Optional build/run helpers
+│   ├── build.sh          # Unix/Git Bash full build
+│   ├── build-check.sh    # Unix/Git Bash incremental build
+│   ├── build.ps1         # Windows cargo build wrapper
+│   ├── lib.ps1           # Shared PowerShell helpers
+│   ├── run-gui.ps1       # GUI run script (Windows)
+│   ├── run-cli.ps1       # CLI run script (Windows)
 │   ├── refresh-models.ps1
-│   ├── restore.ps1
-│   └── build.ps1
-├── build-check.ps1       # Windows incremental build checker
-├── build.rs              # Cargo build script (auto-builds web UI)
+│   └── restore.ps1
+├── build.sh              # Unix/Git Bash → scripts/build.sh
+├── build-check.ps1       # Thin wrapper → codex-launchpad --build-check
+├── build.rs              # Cargo build script (auto-builds web UI on all OSes)
 ├── launch-codex.ps1      # Windows Codex launcher wrapper
-├── diagnose.ps1          # Windows health-check diagnostic
+├── diagnose.sh           # Unix/Git Bash → codex-launchpad --diagnose
+├── diagnose.ps1          # Windows → codex-launchpad --diagnose
 ├── config.example.json   # Public config template
 ├── config.json           # Local config (gitignored)
 ├── run-gui.cmd           # Windows: build + launch GUI

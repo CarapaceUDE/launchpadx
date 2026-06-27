@@ -19,7 +19,9 @@ cd web && npm ci && npm run build
 cargo build --bins
 ```
 
-PowerShell wrappers (`build.cmd`, `run-gui.cmd`, etc.) are **Windows-only conveniences**. On macOS or Linux, use `cargo` and `npm` directly.
+Or use `./build.sh` on macOS/Linux/Git Bash. `cargo build` alone also works — `build.rs` installs web deps and builds the UI when needed.
+
+`build.cmd`, `build-check.ps1`, `run-gui.cmd`, and other `.ps1`/`.cmd` files are **Windows-only shortcuts**. The portable interface is `cargo`, `npm`, and `codex-launchpad` CLI flags such as `--diagnose` and `--build-check`.
 
 ### Running
 
@@ -40,6 +42,7 @@ codex-launchpad --write-config-only
 codex-launchpad --refresh-models
 codex-launchpad --list-models
 codex-launchpad --restore
+codex-launchpad --diagnose
 ```
 
 ## How to Contribute
@@ -74,7 +77,7 @@ src/
     windows.rs     # Windows: PATH search + Store AppID
     macos.rs       # macOS: .app bundle search
     linux.rs       # Linux: PATH + AppImage search
-scripts/           # Windows PowerShell helpers (optional)
+scripts/           # Optional build/run helpers (shell + PowerShell)
 ```
 
 ## Reporting Issues

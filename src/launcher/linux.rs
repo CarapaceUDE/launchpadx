@@ -13,7 +13,9 @@ pub fn resolve() -> Result<LaunchTarget, LauncherError> {
         return Ok(LaunchTarget::Path(path));
     }
 
-    Err(LauncherError::CodexNotFound)
+    Err(LauncherError::CodexNotFound(
+        "searched PATH and common install locations".to_string(),
+    ))
 }
 
 fn common_path_commands_for_linux() -> &'static [&'static str] {

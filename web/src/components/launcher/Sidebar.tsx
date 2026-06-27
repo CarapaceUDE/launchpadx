@@ -1,4 +1,5 @@
 import { Rocket, Boxes, Settings, FileText, Info, RefreshCw, ChevronRight } from "lucide-react";
+import { AppIcon } from "./AppIcon";
 import { ThemeToggle } from "./ThemeToggle";
 import type { NavKey } from "../../context/LauncherContext";
 import { APP_NAME, LICENSE_NOTICE, LICENSE_URL } from "../../lib/branding";
@@ -34,8 +35,8 @@ export function Sidebar({
       >
         <div className="px-3 pt-6 pb-5 lg:px-6 lg:pt-7 lg:pb-6">
           <div className="flex items-center justify-center gap-2.5 lg:justify-start">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/10 ring-1 ring-white/15">
-              <Rocket className="h-4 w-4" />
+            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/15">
+              <AppIcon size={36} className="h-full w-full" />
             </div>
             <div className="hidden min-w-0 lg:block">
               <div className="text-[15px] font-semibold leading-tight tracking-tight text-white">

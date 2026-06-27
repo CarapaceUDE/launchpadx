@@ -106,7 +106,7 @@ pub fn launch(
     let existing = detect_codex_process(config, root);
     if existing.running {
         let method = existing.method.unwrap_or_else(|| "unknown".to_string());
-        return Err(format!("Codex is already running (detected via {method})").into());
+        return Ok(format!("Codex is already running (detected via {method})"));
     }
 
     let local_api = local_api_env(config)?;
@@ -129,6 +129,13 @@ pub fn launch(
                     .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
                 pid_file,
             )?;
+            #[cfg(target_os = "windows")]
+            if !launcher::wait_for_codex_process(10) {
+                return Err(format!(
+                    "Codex launch was requested via {launch_target}, but no Codex process appeared. Set codexCommand in Settings to the full path of Codex.exe or run `codex-launchpad --diagnose`."
+                )
+                .into());
+            }
         }
         LaunchTarget::WindowsStartApp { app_id } => {
             launcher::launch_windows_start_app(app_id)?;

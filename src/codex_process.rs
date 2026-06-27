@@ -84,9 +84,9 @@ impl CodexProcess {
                 .env("OPENAI_API_KEY", api_key);
         }
 
-        // Create a detached process so it survives the parent exiting
+        // Detach from the launcher so Codex keeps running after the parent exits.
         #[cfg(target_os = "windows")]
-        command.creation_flags(0x08000000);
+        command.creation_flags(0x00000008); // DETACHED_PROCESS
 
         let child = command
             .spawn()

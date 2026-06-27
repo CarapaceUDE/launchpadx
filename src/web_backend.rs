@@ -1,6 +1,7 @@
 use crate::app_logic;
 use crate::codex_process;
 use crate::config::LauncherConfig;
+use crate::launcher;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -575,9 +576,15 @@ fn rpc_launch(state: &RpcState, params: serde_json::Value) -> serde_json::Value 
         return serde_json::json!({"error": e.to_string()});
     }
     let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+    let launch_target = match launcher::resolve(&config) {
+        Ok(target) => target.to_string(),
+        Err(e) => return serde_json::json!({"error": e.to_string()}),
+    };
     match app_logic::launch(&config, &state.root, &pid_file) {
-        Ok(message) => serde_json::json!({"ok": true, "message": message}),
-        Err(e) => serde_json::json!({"error": e.to_string()}),
+        Ok(message) => {
+            serde_json::json!({"ok": true, "message": message, "launchTarget": launch_target})
+        }
+        Err(e) => serde_json::json!({"error": e.to_string(), "launchTarget": launch_target}),
     }
 }
 

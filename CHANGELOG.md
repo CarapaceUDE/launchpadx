@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Fixed `run-gui.cmd` / `--build-check` invoking a stale release binary that ignored the flag and tried to launch Codex instead of building.
+- `codex-launchpad` with no arguments now prints help instead of auto-launching Codex; use `--launch` explicitly.
+- Launch no longer errors when Codex is already running — it reports the detected process and leaves it alone.
+- Added cross-platform `codex-launchpad --diagnose` and `codex-launchpad --build-check`; `diagnose.ps1` and `build-check.ps1` are now thin wrappers around the Rust CLI.
+- `build.rs` and `build-check.ps1` now run `npm ci` when `web/node_modules` is missing before building the web UI.
+- Windows Codex launch detection hardened: Microsoft Store shims are no longer launched directly, Start menu AppID lookup is broader, and `explorer.exe` is preferred for packaged app activation.
+- Launch RPC responses now include `launchTarget` for easier troubleshooting when Codex does not appear.
 - Linux launcher now searches PATH for `codex` first (removed Windows-specific `codex-app` from non-Windows platforms).
 - macOS launcher now searches PATH for `codex` before checking `.app` bundles.
 - GUI error log path now uses `dirs::config_dir()` or `dirs::cache_dir()` as fallback instead of the current working directory.

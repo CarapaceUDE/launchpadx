@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import type { CodexConfigInspection } from './lib/codexProfile';
 import type { LauncherConfig, CodexProcessInfo } from './types';
 

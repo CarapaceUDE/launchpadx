@@ -39,8 +39,8 @@ impl fmt::Display for LaunchTarget {
 pub enum LauncherError {
     #[error("configured codexCommand was not found: {0}")]
     MissingConfiguredCommand(String),
-    #[error("could not find Codex; set codexCommand in config.json")]
-    CodexNotFound,
+    #[error("could not find Codex ({0}); set codexCommand in config.json to the full path of Codex.exe")]
+    CodexNotFound(String),
     #[error("failed to launch {program}: {source}")]
     Launch {
         program: String,
@@ -79,6 +79,11 @@ pub fn launch_path(
     })?;
 
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+pub fn wait_for_codex_process(timeout_secs: u64) -> bool {
+    windows::wait_for_codex_process(timeout_secs)
 }
 
 pub fn launch_windows_start_app(
@@ -141,7 +146,9 @@ fn platform_resolve() -> Result<LaunchTarget, LauncherError> {
     }
 
     #[allow(unreachable_code)]
-    Err(LauncherError::CodexNotFound)
+    Err(LauncherError::CodexNotFound(
+        "no platform-specific launcher is available".to_string(),
+    ))
 }
 
 fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError> {
@@ -151,6 +158,10 @@ fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError
             if let Some(app_id) = windows::start_app_id() {
                 return Ok(LaunchTarget::WindowsStartApp { app_id });
             }
+            return Err(LauncherError::Platform(format!(
+                "codexCommand points to the Microsoft Store Codex shim ({}), which Windows blocks from direct launch. Could not find a Codex Start menu AppID — reinstall Codex from the Microsoft Store or set codexCommand to a full path such as %LOCALAPPDATA%\\Programs\\Codex\\Codex.exe",
+                path.display()
+            )));
         }
     }
 

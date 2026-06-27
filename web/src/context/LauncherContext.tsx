@@ -562,9 +562,12 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       const result = await window.codexRPC.launch(configRef.current);
       const payload = unwrap(result);
       const message = (payload as { message?: string }).message ?? "Codex launch requested.";
+      const launchTarget = (payload as { launchTarget?: string }).launchTarget ?? "";
+      const isStoreLaunch = launchTarget.startsWith("StartAppID:");
       setOperation("waiting_for_codex", `${message} Waiting for Codex to appear...`);
       clearPoll();
       let attempts = 0;
+      const maxAttempts = isStoreLaunch ? 45 : 30;
       pollRef.current = setInterval(async () => {
         attempts += 1;
         try {
@@ -580,15 +583,16 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          if (attempts >= 30) {
+          if (attempts >= maxAttempts) {
             clearPoll();
             operationRef.current = "idle";
             setState((prev) => ({
               ...prev,
               operation: "idle",
               serverState: "stopped",
-              statusMessage:
-                "Codex did not start within 60 seconds. Check logs or try again.",
+              statusMessage: isStoreLaunch
+                ? "Codex may still be opening via the Microsoft Store app. Check your taskbar, or set codexCommand in Settings to a full path such as %LOCALAPPDATA%\\Programs\\Codex\\Codex.exe."
+                : "Codex did not start within 60 seconds. Check logs, set codexCommand in Settings, or run codex-launchpad --diagnose.",
               statusVariant: "error",
             }));
           } else if (attempts % 3 === 0) {
