@@ -113,11 +113,7 @@ fn load_app_icon(root: &Path) -> Option<tao::window::Icon> {
         }
     }
 
-    gui_log!(
-        Some(root),
-        "INFO",
-        "Using embedded app icon fallback"
-    );
+    gui_log!(Some(root), "INFO", "Using embedded app icon fallback");
     load_icon(EMBEDDED_ICON_PNG)
 }
 
