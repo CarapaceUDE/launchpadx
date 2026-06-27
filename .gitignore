@@ -26,6 +26,9 @@ web/e2e/fixtures/backups/
 /.tmp/
 /tmp/
 
+# Local-only release automation (not shared)
+scripts/local/
+
 # Local/session artifacts (not part of the app)
 agent-tools/
 codex-launchpad/
