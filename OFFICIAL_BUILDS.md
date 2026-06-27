@@ -27,14 +27,16 @@ You may **not**, unless Carapace LLC gives written permission:
 
 Unauthorized redistribution of official binaries is not permitted.
 
+Official supporters and anyone building from source are welcome to ask for **limited community support** on our [Discord server](https://carapaceai.org/discord) — setup help, build issues, and bug reports.
+
 ## Unofficial builds
 
 Community members may compile and distribute binaries from the MIT-licensed source. Those builds are **not** official Carapace LLC releases and must not use Carapace branding in a way that implies endorsement. See the trademark notice in [README.md](README.md).
 
 ## Building from source
 
-You do not need Patreon access to use this software. Follow the build instructions in [README.md](README.md) to compile your own binary.
+You do not need Patreon access to use this software. Follow the build instructions in [README.md](README.md) to compile your own binary. If you get stuck, run `codex-launchpad --diagnose` and ask on [Discord](https://carapaceai.org/discord) — we offer limited community support there.
 
 ## Questions
 
-Contact [security@carapaceai.org](mailto:security@carapaceai.org) for licensing questions, or reach out through [carapaceai.org](https://carapaceai.org).
+Contact [security@carapaceai.org](mailto:security@carapaceai.org) for licensing questions, reach out through [carapaceai.org](https://carapaceai.org), or join our [Discord community](https://carapaceai.org/discord) for limited setup and support help.
