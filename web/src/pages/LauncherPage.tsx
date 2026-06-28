@@ -21,6 +21,7 @@ import { buildOpenAiBaseUrl } from "../lib/endpoint";
 export function LauncherPage() {
   const {
     running,
+    isLaunching,
     statusMessage,
     models,
     config,
@@ -60,6 +61,9 @@ export function LauncherPage() {
       ? "Refresh models from your endpoint, then select one above to enable Start."
       : "Select a model above to enable Start."
     : undefined;
+  const providerLabel = config.persistCodexConfig === true
+          ? (config.codexProviderName || "OpenAI")
+          : "Default";
 
   const handleEndpointChange = useCallback(
     (patch: { ip?: string; port?: string; scheme?: "http" | "https" }) => {
@@ -157,6 +161,8 @@ export function LauncherPage() {
                   refreshing={refreshing}
                   onViewModelDetails={handleViewDetails}
                   modelStatusHint={statusMessage}
+                  isLaunching={isLaunching}
+                  providerLabel={providerLabel}
                 />
 
                 <CodexProfileBar

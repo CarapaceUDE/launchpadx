@@ -29,6 +29,7 @@ export interface CodexConfigForm {
 }
 
 interface LauncherState {
+  isLaunching: boolean;
   running: boolean;
   apiReady: boolean;
   statusMessage: string;
@@ -68,6 +69,7 @@ function unwrap<T>(result: { data?: T; error?: string | null }): T {
 
 export function LauncherProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LauncherState>({
+    isLaunching: false,
     running: false,
     apiReady: false,
     statusMessage: "Initializing...",
@@ -207,13 +209,14 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       await loadConfig();
-      await healthCheck();
+      // skip health check — server is expected to be down after stop
       await refreshModels();
     })();
   }, [loadConfig, healthCheck, refreshModels]);
 
   const launch = useCallback(async () => {
     setState((prev) => ({ ...prev, statusMessage: "Launching Codex..." }));
+    setState((prev) => ({ ...prev, isLaunching: true }));
     try {
       await flushConfigSave();
       const result = await window.codexRPC.launch();
@@ -253,14 +256,14 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       const result = await window.codexRPC.stop();
       const payload = unwrap(result);
       const message = (payload as { message?: string }).message ?? "Codex stopped.";
-      await healthCheck();
+      // skip health check — server is expected to be down after stop
       setState((prev) => ({ ...prev, statusMessage: message }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      await healthCheck();
+      // skip health check — server is expected to be down after stop
       setState((prev) => ({ ...prev, statusMessage: msg }));
     }
-  }, [clearPoll, healthCheck]);
+  }, [clearPoll]);
 
   const writeCodexConfig = useCallback(async () => {
     try {

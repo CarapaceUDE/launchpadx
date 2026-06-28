@@ -7,6 +7,7 @@ use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tao::dpi::LogicalSize;
+use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop};
 use tao::window::WindowBuilder;
 use wry::WebView;
@@ -371,9 +372,15 @@ pub fn launch_web_gui(
 
     gui_log!(Some(root.as_path()), "INFO", "Running event loop");
     let _pid_file = codex_process::CodexProcess::spawn_pid_file_path(&root);
-    event_loop.run(move |_, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
-    });
+    event_loop.run(move |event, _, control_flow| {
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                    ..
+             } => *control_flow = ControlFlow::Exit,
+              _ => *control_flow = ControlFlow::Wait,
+          }
+      });
 }
 
 fn start_server(
