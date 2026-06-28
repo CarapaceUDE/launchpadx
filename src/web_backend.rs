@@ -1,6 +1,7 @@
 use crate::app_logic;
 use crate::codex_process;
 use crate::config::LauncherConfig;
+use crate::launcher;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -21,8 +22,10 @@ pub struct RpcState {
 
 const ICON_FILENAME: &str = "icon.ico";
 const ICON_PNG: &str = "icon.png";
+const EMBEDDED_ICON_PNG: &[u8] = include_bytes!("../assets/icon.png");
 const DIST_DIR: &str = "web/dist";
 const DIST_INDEX: &str = "web/dist/index.html";
+const EMBEDDED_LICENSE: &str = include_str!("../LICENSE");
 const MAX_RPC_BODY_BYTES: usize = 64 * 1024;
 const MAX_LOG_ENTRIES: usize = 500;
 
@@ -72,21 +75,48 @@ pub fn resolve_gui_root() -> PathBuf {
     fallback
 }
 
-fn resolve_icon_path(root: &Path) -> PathBuf {
-    let candidates = [
+fn icon_candidates_for(root: &Path) -> Vec<PathBuf> {
+    vec![
         root.join("assets").join(ICON_FILENAME),
         root.join("assets").join(ICON_PNG),
         root.join(ICON_FILENAME),
         root.join(ICON_PNG),
-        root.join("..").join("assets").join(ICON_FILENAME),
-        root.join("..").join("assets").join(ICON_PNG),
-    ];
-    for candidate in &candidates {
-        if candidate.exists() {
-            return candidate.to_path_buf();
+    ]
+}
+
+fn resolve_icon_path(root: &Path) -> Option<PathBuf> {
+    let mut dir = Some(root.to_path_buf());
+    for _ in 0..8 {
+        let Some(ref current) = dir else {
+            break;
+        };
+        for candidate in icon_candidates_for(current) {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        dir = current.parent().map(|p| p.to_path_buf());
+    }
+    None
+}
+
+fn load_app_icon(root: &Path) -> Option<tao::window::Icon> {
+    if let Some(icon_path) = resolve_icon_path(root) {
+        if let Ok(icon_data) = std::fs::read(&icon_path) {
+            if let Some(icon) = load_icon(&icon_data) {
+                return Some(icon);
+            }
+            gui_log!(
+                Some(root),
+                "WARN",
+                "Failed to decode icon at {}",
+                icon_path.display()
+            );
         }
     }
-    root.join("assets").join(ICON_PNG)
+
+    gui_log!(Some(root), "INFO", "Using embedded app icon fallback");
+    load_icon(EMBEDDED_ICON_PNG)
 }
 
 fn load_icon(data: &[u8]) -> Option<tao::window::Icon> {
@@ -139,8 +169,8 @@ fn redact_sensitive_text(input: &str) -> String {
 
 fn redact_quoted_field(input: &str, field_name: &str) -> String {
     let patterns = [
-        format!("\"{field_name}\":"),
-        format!("\"{field_name}\" ="),
+        format!("\"{}\":", field_name),
+        format!("\"{}\" =", field_name),
         format!("{field_name}:"),
         format!("{field_name} ="),
     ];
@@ -213,46 +243,21 @@ fn redact_token_after_marker(input: &str, marker: &str) -> String {
     result
 }
 
-pub fn launch_web_gui(
-    root: PathBuf,
-    config_path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    gui_log!(Some(root.as_path()), "INFO", "Starting web backend");
-    gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "Config: {}",
-        config_path.display()
-    );
-
+fn ensure_dist_dir(root: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let dist_dir = root.join(DIST_DIR);
     if !dist_dir.exists() {
         return Err("Web app not built. Run npm run build in the web/ directory.".into());
     }
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "Dist dir: {} (exists: {})",
-        dist_dir.display(),
-        dist_dir.exists()
-    );
+    Ok(dist_dir)
+}
 
-    let state = Arc::new(Mutex::new(RpcState {
-        config_path,
-        root: root.clone(),
-    }));
-
-    let (server, server_url) = start_server(&dist_dir, Arc::clone(&state))?;
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "HTTP server started on: {}",
-        server_url
-    );
-
-    let thread_root = root.clone();
-    let _server_handle = std::thread::spawn(move || {
+fn spawn_server_thread(
+    dist_dir: PathBuf,
+    state: Arc<Mutex<RpcState>>,
+    server: tiny_http::Server,
+    thread_root: PathBuf,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
         gui_log!(
             Some(thread_root.as_path()),
             "INFO",
@@ -270,29 +275,109 @@ pub fn launch_web_gui(
                 );
             }
         }
-    });
+    })
+}
+
+/// Headless HTTP server for Playwright and agent-driven E2E tests.
+pub fn serve_web_ui(
+    root: PathBuf,
+    config_path: PathBuf,
+    port: Option<u16>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Starting headless web backend"
+    );
+    gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Config: {}",
+        config_path.display()
+    );
+
+    let dist_dir = ensure_dist_dir(&root)?;
+    let state = Arc::new(Mutex::new(RpcState {
+        config_path,
+        root: root.clone(),
+    }));
+
+    let (server, server_url) = start_server(port)?;
+    println!("CODEX_LAUNCHER_READY={server_url}");
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "HTTP server listening on {server_url}"
+    );
+
+    for request in server.incoming_requests() {
+        if let Err(_e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            handle_request(&dist_dir, &state, request);
+        })) {
+            gui_log!(
+                Some(root.as_path()),
+                "ERROR",
+                "RPC handler panicked: {:?}",
+                _e
+            );
+        }
+    }
+
+    Ok(())
+}
+
+pub fn launch_web_gui(
+    root: PathBuf,
+    config_path: PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    gui_log!(Some(root.as_path()), "INFO", "Starting web backend");
+    gui_log!(Some(root.as_path()), "INFO", "Root: {}", root.display());
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Config: {}",
+        config_path.display()
+    );
+
+    let dist_dir = ensure_dist_dir(&root)?;
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "Dist dir: {} (exists: {})",
+        dist_dir.display(),
+        dist_dir.exists()
+    );
+
+    let state = Arc::new(Mutex::new(RpcState {
+        config_path,
+        root: root.clone(),
+    }));
+
+    let (server, server_url) = start_server(None)?;
+    gui_log!(
+        Some(root.as_path()),
+        "INFO",
+        "HTTP server started on: {}",
+        server_url
+    );
+
+    let _server_handle = spawn_server_thread(dist_dir, Arc::clone(&state), server, root.clone());
 
     gui_log!(Some(root.as_path()), "INFO", "Server thread spawned");
     gui_log!(Some(root.as_path()), "INFO", "Creating event loop");
     let event_loop = EventLoop::new();
     gui_log!(Some(root.as_path()), "INFO", "Event loop created");
 
-    // Load icon - try ICO first, fallback to PNG
-    let icon_path = resolve_icon_path(&root);
-    gui_log!(
-        Some(root.as_path()),
-        "INFO",
-        "Icon path: {}",
-        icon_path.display()
-    );
-    let icon_data = std::fs::read(&icon_path).unwrap_or_default();
-    let icon = if icon_data.is_empty() {
-        gui_log!(Some(root.as_path()), "WARN", "No icon found");
-        None
-    } else {
-        gui_log!(Some(root.as_path()), "INFO", "Loading icon");
-        load_icon(&icon_data)
-    };
+    let icon = load_app_icon(root.as_path());
+    if let Some(icon_path) = resolve_icon_path(&root) {
+        gui_log!(
+            Some(root.as_path()),
+            "INFO",
+            "Icon path: {}",
+            icon_path.display()
+        );
+    }
     gui_log!(
         Some(root.as_path()),
         "INFO",
@@ -303,7 +388,7 @@ pub fn launch_web_gui(
     // Create a single visible window with WebView embedded
     gui_log!(Some(root.as_path()), "INFO", "Creating window");
     let window_builder = WindowBuilder::new()
-        .with_title("Codex Local Launcher")
+        .with_title(crate::branding::APP_NAME)
         .with_visible(true)
         .with_inner_size(LogicalSize::new(1280.0, 800.0));
 
@@ -320,7 +405,7 @@ pub fn launch_web_gui(
     gui_log!(Some(root.as_path()), "INFO", "Creating WebView");
     let mut attrs = WebViewAttributes {
         url: Some(server_url.parse()?),
-        devtools: true,
+        devtools: false,
         ..WebViewAttributes::default()
     };
     attrs.initialization_scripts.push(
@@ -329,40 +414,8 @@ pub fn launch_web_gui(
           };
         window.addEventListener("unhandledrejection", function(e) {
             console.error("Unhandled rejection:", e.reason);
-          });
-        window.codexRPC = {
-            call: function(method, params) {
-                return fetch("/rpc", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ method: method, params: params || {} })
-                  })
-                  .then(function(r) { return r.json(); })
-                  .then(function(result) {
-                    if (result.error) throw new Error(result.error);
-                    return result;
-                  })
-                  .catch(function(e) {
-                    console.error("RPC call to " + method + " failed:", e);
-                    throw e;
-                  });
-              },
-            launch: function() { return this.call("launch", {}); },
-            stop: function() { return this.call("stop", {}); },
-            saveConfig: function(cfg) { return this.call("saveConfig", cfg); },
-            loadConfig: function() { return this.call("loadConfig", {}); },
-            healthCheck: function(cfg) { return this.call("healthCheck", cfg || {}); },
-            listModels: function() { return this.call("listModels", {}); },
-            refreshModels: function(cfg) { return this.call("refreshModels", cfg || {}); },
-            writeCodexConfig: function() { return this.call("writeCodexConfig", {}); },
-            revertCodexConfig: function() { return this.call("revertCodexConfig", {}); },
-            detectCodex: function() { return this.call("detectCodex", {}); },
-            killCodexByPid: function(pid) { return this.call("killCodexByPid", { pid }); },
-            openDirectoryPicker: function() { return this.call("openDirectoryPicker", {}); },
-            getAppLogs: function() { return this.call("getAppLogs", {}); }
-          };
-          "#
-        .to_string(),
+          });"#
+            .to_string(),
     );
 
     let _webview = WebView::new(&window, attrs)?;
@@ -384,10 +437,12 @@ pub fn launch_web_gui(
 }
 
 fn start_server(
-    _dist_dir: &Path,
-    _state: Arc<Mutex<RpcState>>,
+    port: Option<u16>,
 ) -> Result<(tiny_http::Server, String), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let listener = match port {
+        Some(port) => TcpListener::bind(format!("127.0.0.1:{port}"))?,
+        None => TcpListener::bind("127.0.0.1:0")?,
+    };
     let port = listener.local_addr()?.port();
     let server = tiny_http::Server::from_listener(listener, None)
         .map_err(|e| Box::new(std::io::Error::other(e)))?;
@@ -399,16 +454,19 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
     match method {
         "loadConfig" => rpc_load_config(state),
         "saveConfig" => rpc_save_config(state, params),
-        "launch" => rpc_launch(state),
+        "launch" => rpc_launch(state, params),
         "stop" => rpc_stop(state),
         "healthCheck" => rpc_health_check(state, params),
         "listModels" => rpc_list_models(state),
         "refreshModels" => rpc_refresh_models(state, params),
-        "writeCodexConfig" => rpc_write_codex_config(state),
-        "revertCodexConfig" => rpc_revert_codex_config(state),
+        "writeCodexConfig" => rpc_write_codex_config(state, params),
+        "syncCodexConfig" => rpc_sync_codex_config(state, params),
+        "inspectCodexConfig" => rpc_inspect_codex_config(state),
+        "revertCodexConfig" => rpc_revert_codex_config(state, params),
         "detectCodex" => rpc_detect_codex(state),
         "killCodexByPid" => rpc_kill_codex_by_pid(params),
         "toggleAutoStart" => rpc_toggle_auto_start(state),
+        "setAutoStart" => rpc_set_auto_start(state, params),
         "openDirectoryPicker" => rpc_open_directory_picker(),
         "getAppLogs" => rpc_get_app_logs(state),
         _ => serde_json::json!({"error": format!("Unknown method: {}", method)}),
@@ -427,13 +485,44 @@ fn config_for_request(
     state: &RpcState,
     params: &serde_json::Value,
 ) -> Result<LauncherConfig, String> {
+    config_with_overlay(state, params, false)
+}
+
+fn config_for_mutation(
+    state: &RpcState,
+    params: &serde_json::Value,
+) -> Result<LauncherConfig, String> {
+    if params.is_null() || params.as_object().is_some_and(|fields| fields.is_empty()) {
+        return LauncherConfig::read(&state.config_path).map_err(|e| e.to_string());
+    }
+
+    let incoming: LauncherConfig =
+        serde_json::from_value(params.clone()).map_err(|e| format!("Invalid config JSON: {e}"))?;
+    match LauncherConfig::read(&state.config_path) {
+        Ok(mut existing) => {
+            existing.merge_from(&incoming);
+            Ok(existing)
+        }
+        Err(_) => Ok(incoming),
+    }
+}
+
+fn config_with_overlay(
+    state: &RpcState,
+    params: &serde_json::Value,
+    full_overlay: bool,
+) -> Result<LauncherConfig, String> {
     let incoming = serde_json::from_value::<LauncherConfig>(params.clone()).ok();
     let has_overlay = incoming.as_ref().is_some_and(|cfg| {
-        cfg.ollama_ip.is_some()
-            || cfg.openai_base_url.is_some()
-            || cfg.ollama_port.is_some()
-            || cfg.ollama_scheme.is_some()
-            || cfg.codex_model.is_some()
+        if full_overlay {
+            true
+        } else {
+            cfg.ollama_ip.is_some()
+                || cfg.openai_base_url.is_some()
+                || cfg.ollama_port.is_some()
+                || cfg.ollama_scheme.is_some()
+                || cfg.codex_model.is_some()
+        }
     });
 
     if has_overlay {
@@ -465,18 +554,44 @@ fn rpc_save_config(state: &RpcState, params: serde_json::Value) -> serde_json::V
     }
 }
 
-fn rpc_launch(state: &RpcState) -> serde_json::Value {
-    let config = match LauncherConfig::read(&state.config_path) {
-        Ok(c) => c,
-        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+fn rpc_launch(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let incoming = serde_json::from_value::<LauncherConfig>(params).ok();
+    let has_overlay = incoming.as_ref().is_some_and(|cfg| {
+        cfg.ollama_ip.is_some()
+            || cfg.openai_base_url.is_some()
+            || cfg.ollama_port.is_some()
+            || cfg.ollama_scheme.is_some()
+            || cfg.codex_model.is_some()
+    });
+    let config = if has_overlay {
+        match LauncherConfig::read(&state.config_path) {
+            Ok(mut existing) => {
+                if let Some(ref incoming) = incoming {
+                    existing.merge_from(incoming);
+                }
+                existing
+            }
+            Err(_) => incoming.unwrap_or_default(),
+        }
+    } else {
+        match LauncherConfig::read(&state.config_path) {
+            Ok(c) => c,
+            Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+        }
     };
-    if let Err(e) = app_logic::write_config(&config) {
+    if let Err(e) = app_logic::write_config_for_launch(&config) {
         return serde_json::json!({"error": e.to_string()});
     }
     let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+    let launch_target = match launcher::resolve(&config) {
+        Ok(target) => target.to_string(),
+        Err(e) => return serde_json::json!({"error": e.to_string()}),
+    };
     match app_logic::launch(&config, &state.root, &pid_file) {
-        Ok(message) => serde_json::json!({"ok": true, "message": message}),
-        Err(e) => serde_json::json!({"error": e.to_string()}),
+        Ok(message) => {
+            serde_json::json!({"ok": true, "message": message, "launchTarget": launch_target})
+        }
+        Err(e) => serde_json::json!({"error": e.to_string(), "launchTarget": launch_target}),
     }
 }
 
@@ -575,24 +690,46 @@ fn rpc_refresh_models(state: &RpcState, params: serde_json::Value) -> serde_json
     }
 }
 
-fn rpc_write_codex_config(state: &RpcState) -> serde_json::Value {
-    let config = match LauncherConfig::read(&state.config_path) {
+fn rpc_write_codex_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_mutation(state, &params) {
         Ok(c) => c,
-        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+        Err(e) => return serde_json::json!({"error": e}),
     };
-    match app_logic::write_config(&config) {
-        Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
+    match app_logic::sync_codex_config(&config) {
+        Ok(msg) => {
+            let inspection = app_logic::inspect_codex_config(&config).ok();
+            serde_json::json!({"ok": true, "message": msg, "inspection": inspection})
+        }
         Err(e) => serde_json::json!({"error": e.to_string()}),
     }
 }
 
-fn rpc_revert_codex_config(state: &RpcState) -> serde_json::Value {
+fn rpc_sync_codex_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    rpc_write_codex_config(state, params)
+}
+
+fn rpc_inspect_codex_config(state: &RpcState) -> serde_json::Value {
     let config = match LauncherConfig::read(&state.config_path) {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
     };
+    match app_logic::inspect_codex_config(&config) {
+        Ok(inspection) => serde_json::to_value(inspection)
+            .unwrap_or_else(|_| serde_json::json!({"error": "Failed to serialize inspection"})),
+        Err(e) => serde_json::json!({"error": e.to_string()}),
+    }
+}
+
+fn rpc_revert_codex_config(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_mutation(state, &params) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": e}),
+    };
     match app_logic::revert_codex_config(&config) {
-        Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
+        Ok(msg) => {
+            let inspection = app_logic::inspect_codex_config(&config).ok();
+            serde_json::json!({"ok": true, "message": msg, "inspection": inspection})
+        }
         Err(e) => serde_json::json!({"error": e.to_string()}),
     }
 }
@@ -660,14 +797,37 @@ fn rpc_toggle_auto_start(state: &RpcState) -> serde_json::Value {
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
     };
     let enabled = config.auto_start.unwrap_or(false);
+    rpc_apply_auto_start(&config, !enabled)
+}
+
+fn rpc_set_auto_start(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let enabled = params
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let mut config = match LauncherConfig::read(&state.config_path) {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
+    };
+
+    config.auto_start = Some(enabled);
+    if let Err(e) = config.write(&state.config_path) {
+        return serde_json::json!({"error": format!("Cannot save config: {}", e)});
+    }
+
+    rpc_apply_auto_start(&config, enabled)
+}
+
+fn rpc_apply_auto_start(config: &LauncherConfig, enabled: bool) -> serde_json::Value {
     if enabled {
-        match app_logic::disable_auto_start(&config) {
-            Ok(msg) => serde_json::json!({"ok": true, "enabled": false, "message": msg}),
+        match app_logic::enable_auto_start(config) {
+            Ok(msg) => serde_json::json!({"ok": true, "enabled": true, "message": msg}),
             Err(e) => serde_json::json!({"error": e.to_string()}),
         }
     } else {
-        match app_logic::enable_auto_start(&config) {
-            Ok(msg) => serde_json::json!({"ok": true, "enabled": true, "message": msg}),
+        match app_logic::disable_auto_start(config) {
+            Ok(msg) => serde_json::json!({"ok": true, "enabled": false, "message": msg}),
             Err(e) => serde_json::json!({"error": e.to_string()}),
         }
     }
@@ -788,6 +948,16 @@ fn handle_request(dist_dir: &Path, state: &Arc<Mutex<RpcState>>, mut request: ti
         return;
     }
 
+    if uri == "/LICENSE" || uri == "/license" {
+        let resp = make_file_response(
+            200,
+            "text/plain; charset=utf-8",
+            EMBEDDED_LICENSE.as_bytes().to_vec(),
+        );
+        let _ = request.respond(resp);
+        return;
+    }
+
     let clean_path = uri.trim_start_matches("/").trim_start_matches("index.html");
     let sanitized = clean_path
         .split("/")
@@ -827,7 +997,20 @@ fn handle_request(dist_dir: &Path, state: &Arc<Mutex<RpcState>>, mut request: ti
 
 #[cfg(test)]
 mod tests {
-    use super::redact_sensitive_text;
+    use super::{load_icon, redact_sensitive_text, resolve_icon_path, EMBEDDED_ICON_PNG};
+    use std::path::PathBuf;
+
+    #[test]
+    fn embedded_app_icon_decodes() {
+        assert!(load_icon(EMBEDDED_ICON_PNG).is_some());
+    }
+
+    #[test]
+    fn resolve_icon_path_finds_repo_asset() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let icon_path = resolve_icon_path(&root).expect("repo icon.png should resolve");
+        assert!(icon_path.ends_with("assets/icon.png"));
+    }
 
     #[test]
     fn redacts_json_api_keys() {

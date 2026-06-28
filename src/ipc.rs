@@ -68,7 +68,7 @@ fn do_launch(state: &IpcState) -> IpcResponse {
         Err(e) => return IpcResponse::err(format!("Cannot read config: {e}")),
     };
 
-    if let Err(e) = app_logic::write_config(&config) {
+    if let Err(e) = app_logic::write_config_for_launch(&config) {
         return IpcResponse::err(format!("Failed to write Codex config: {e}"));
     }
 

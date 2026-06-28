@@ -1,0 +1,13 @@
+model = "llama3.2"
+model_provider = "codex-launchpad"
+
+[model_providers.openai]
+name = "OpenAI"
+base_url = "https://api.openai.com/v1"
+
+[model_providers.codex-launchpad]
+name = "Codex Launchpad"
+base_url = "http://127.0.0.1:11499/v1"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "readme-demo-key"

@@ -101,11 +101,56 @@
   * {
     border-color: var(--color-border);
   }
-  html, body {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  html, body, #root {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+  select.themed-native-select {
+    color-scheme: inherit;
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  select.themed-native-select.pr-9 {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+  }
+  select.themed-native-select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
+}
+
+@utility themed-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent) var(--muted);
+}
+@layer utilities {
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-track {
+    background: var(--muted);
+    border-radius: 4px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 65%, transparent);
+    border-radius: 4px;
+    border: 2px solid var(--muted);
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
   }
 }
 

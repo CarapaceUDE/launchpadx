@@ -14,7 +14,9 @@ pub fn resolve() -> Result<LaunchTarget, LauncherError> {
         return Ok(LaunchTarget::MacAppBundle(bundle));
     }
 
-    Err(LauncherError::CodexNotFound)
+    Err(LauncherError::CodexNotFound(
+        "searched PATH and /Applications/Codex.app".to_string(),
+    ))
 }
 
 fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError> {
@@ -24,23 +26,24 @@ fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError
 pub fn launch_bundle(
     bundle: &Path,
     working_directory: &Path,
-    base_url: &str,
-    api_key: &str,
+    local_api: Option<(&str, &str)>,
 ) -> Result<(), LauncherError> {
     let executable = bundle.join("Contents/MacOS/Codex");
     if executable.exists() {
-        return super::launch_path(&executable, working_directory, &[], base_url, api_key);
+        return super::launch_path(&executable, working_directory, &[], local_api);
     }
 
-    Command::new("open")
-        .arg(bundle)
-        .env("OPENAI_BASE_URL", base_url)
-        .env("OPENAI_API_KEY", api_key)
-        .spawn()
-        .map_err(|source| LauncherError::Launch {
-            program: bundle.display().to_string(),
-            source,
-        })?;
+    let mut command = Command::new("open");
+    command.arg(bundle);
+    if let Some((base_url, api_key)) = local_api {
+        command
+            .env("OPENAI_BASE_URL", base_url)
+            .env("OPENAI_API_KEY", api_key);
+    }
+    command.spawn().map_err(|source| LauncherError::Launch {
+        program: bundle.display().to_string(),
+        source,
+    })?;
     Ok(())
 }
 

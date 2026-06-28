@@ -38,7 +38,7 @@ export function ModelCard({
               value={selected}
               onChange={(e) => onSelect(e.target.value)}
               disabled={empty}
-              className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:bg-muted/60 disabled:text-muted-foreground"
+              className="themed-native-select h-[38px] w-full px-3 pr-9 text-sm focus:ring-4 disabled:bg-muted/60 disabled:text-muted-foreground"
             >
               {empty ? (
                 <option value="">No models detected</option>

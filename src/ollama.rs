@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::config::LauncherConfig;
 
-const CACHE_DIR_NAME: &str = "codex-local-launcher";
+const CACHE_DIR_NAME: &str = "codex-launchpad";
 const MODEL_CACHE_FILE_NAME: &str = "ollama-models.json";
 
 #[derive(Debug, Error)]

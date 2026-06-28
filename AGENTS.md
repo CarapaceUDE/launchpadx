@@ -1,29 +1,29 @@
-# Codex Local Launcher – Agent Instructions
+# Codex Launchpad â€” Agent Instructions
 
 ## Project Overview
 
 Rust GUI/CLI application with a React + Vite web UI. The Rust code provides:
-- **GUI binary** (`codex-local-launcher --gui`) – runs a Tauri-like webview app using `wry`/`tao`
-- **CLI binary** (`codex-local-launcher`) – headless: discover models, apply Codex config, refresh model cache
-- **Embedded HTTP server** (`web_backend.rs`) – serves the web UI and exposes `/api/tags` etc.
+- **GUI mode** (`codex-launchpad --gui`) â€” runs a Tauri-like webview app using `wry`/`tao`
+- **CLI mode** (`codex-launchpad`) â€” headless: discover models, apply Codex config, refresh model cache
+- **Embedded HTTP server** (`web_backend.rs`) â€” serves the web UI and exposes RPC endpoints
 
 The web UI is a standalone Vite + React + Tailwind app that gets bundled and embedded into the Rust binary.
 
 ## Build System
 
-- **Rust**: `cargo build --release --bins` (two binaries: GUI and CLI)
-- **Web UI**: `cd web && npm run build` (Vite ? `web/dist/`)
-- **Build script**: `build.rs` auto-runs `npm run build` if `web/dist/index.html` is missing
-- **Build checker**: `build-check.ps1` checks timestamps and rebuilds only what's stale
-- **Full build**: `build.cmd` ? `scripts\build.ps1` ? `cargo build --bins`
-- **Tests**: `test.cmd` ? `cargo fmt -- --check && cargo test && cargo clippy --all-targets -- -D warnings`
+- **Rust**: `cargo build --release --bin codex-launchpad`
+- **Web UI**: `cd web && npm run build` (Vite â†’ `web/dist/`)
+- **Build script**: `build.rs` auto-runs `npm ci` + `npm run build` if needed (all OSes)
+- **Build checker**: `codex-launchpad --build-check` (or `build-check.sh` / `build-check.ps1` wrappers)
+- **Full build**: `cargo build --release`, or `./build.sh` / `build.cmd` â†’ `scripts\build.ps1`
+- **Tests**: `test.cmd` â†’ `cargo fmt -- --check && cargo test && cargo clippy --all-targets -- -D warnings`
 
 ### Common build commands
 
 ```powershell
 cargo build                    # Debug build
 cargo build --release          # Release build
-cargo build --release --bin codex-local-launcher  # Specific binary
+cargo build --release --bin codex-launchpad  # Specific binary
 cd web && npm run build        # Build web UI only
 ```
 
@@ -44,14 +44,14 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt -- --check
 ```
 
-Tests are Rust unit tests. No JS/TS tests are configured for the web UI.
+Rust unit tests live under `src/`. Playwright E2E tests live in `web/e2e/` (`cd web && npm run test:e2e`).
 
 ## Web UI
 
 Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 - Source: `web/src/` (components, pages, context, types)
 - Output: `web/dist/` (gitignored)
-- Dev: `cd web && npm run dev` (if vite dev server is configured)
+- Dev: `cd web && npm run dev`
 - Build: `cd web && npm run build`
 
 ## Code Style
@@ -63,7 +63,7 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 ## Common Tasks
 
 ### Adding a new config field
-1. Update `src/main.rs` (serde struct) to include the field
+1. Update `src/config.rs` (serde struct) to include the field
 2. Update `config.example.json` with the new field
 3. Update UI components if the field is user-editable
 4. Run `cargo clippy -- -D warnings` to verify
@@ -76,7 +76,7 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 
 ### Changing the build system
 1. Edit `build.rs` for Cargo-level automation
-2. Edit `build-check.ps1` for smart timestamp-based rebuilding
+2. Edit `src/build_check.rs` for smart timestamp-based rebuilding
 3. Run `build.cmd` to verify the full build pipeline works
 
 ## File Map
@@ -96,6 +96,8 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 | `scripts/run-cli.ps1` | CLI launch script |
 | `scripts/refresh-models.ps1` | Refresh model cache |
 | `scripts/restore.ps1` | Restore Codex config |
-| `build-check.ps1` | Smart build checker |
+| `codex-launchpad --build-check` | Smart incremental build + staging |
+| `build-check.sh` / `build-check.ps1` | Thin wrappers around `--build-check` |
 | `launch-codex.ps1` | Standalone Codex launcher |
-| `diagnose.ps1` | Health check diagnostic |
+| `codex-launchpad --diagnose` | Cross-platform health check |
+| `diagnose.sh` / `diagnose.ps1` | Thin wrappers around `--diagnose` |

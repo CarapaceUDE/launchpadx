@@ -1,15 +1,26 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 use super::{common_path_commands, find_on_path, first_existing, LaunchTarget, LauncherError};
 
 pub fn resolve() -> Result<LaunchTarget, LauncherError> {
+    let mut saw_packaged_shim = false;
+
     for name in common_path_commands() {
         if let Some(path) = find_on_path(name) {
             if is_packaged_codex_resource(&path) {
+                saw_packaged_shim = true;
                 continue;
             }
             return Ok(LaunchTarget::Path(path));
+        }
+    }
+
+    if saw_packaged_shim {
+        if let Some(app_id) = start_app_id() {
+            return Ok(LaunchTarget::WindowsStartApp { app_id });
         }
     }
 
@@ -21,19 +32,33 @@ pub fn resolve() -> Result<LaunchTarget, LauncherError> {
         return Ok(LaunchTarget::WindowsStartApp { app_id });
     }
 
-    Err(LauncherError::CodexNotFound)
+    Err(LauncherError::CodexNotFound(
+        "searched PATH, common install folders, and the Windows Start menu".to_string(),
+    ))
 }
 
 pub fn launch_start_app(app_id: &str) -> Result<(), LauncherError> {
     let target = format!("shell:AppsFolder\\{app_id}");
-    let script = format!("Start-Process -FilePath '{}'", target.replace('\'', "''"));
-    Command::new("powershell.exe")
-        .args(["-NoProfile", "-Command", &script])
+
+    let launched = Command::new("explorer.exe")
+        .arg(&target)
         .spawn()
-        .map_err(|source| LauncherError::Launch {
-            program: target,
-            source,
-        })?;
+        .is_ok()
+        || launch_via_powershell(&target);
+
+    if !launched {
+        return Err(LauncherError::Launch {
+            program: target.clone(),
+            source: std::io::Error::other(
+                "explorer.exe and PowerShell Start-Process both failed",
+            ),
+        });
+    }
+
+    if wait_for_codex_process(20) {
+        return Ok(());
+    }
+
     Ok(())
 }
 
@@ -45,7 +70,14 @@ pub fn is_packaged_codex_resource(path: &Path) -> bool {
 }
 
 pub fn start_app_id() -> Option<String> {
-    let script = "(Get-StartApps Codex | Where-Object { $_.Name -eq 'Codex' -or $_.Name -like 'Codex*' } | Select-Object -First 1 -ExpandProperty AppID)";
+    let script = r#"
+$apps = Get-StartApps | Where-Object {
+    $_.AppID -like '*OpenAI.Codex*' -or
+    $_.Name -eq 'Codex' -or
+    $_.Name -like 'Codex*'
+}
+$apps | Select-Object -First 1 -ExpandProperty AppID
+"#;
     let output = Command::new("powershell.exe")
         .args(["-NoProfile", "-Command", script])
         .output()
@@ -55,6 +87,48 @@ pub fn start_app_id() -> Option<String> {
     }
     let app_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
     (!app_id.is_empty()).then_some(app_id)
+}
+
+fn launch_via_powershell(target: &str) -> bool {
+    let script = format!(
+        "Start-Process -FilePath '{}'",
+        target.replace('\'', "''")
+    );
+    Command::new("powershell.exe")
+        .args(["-NoProfile", "-Command", &script])
+        .spawn()
+        .is_ok()
+}
+
+pub fn wait_for_codex_process(timeout_secs: u64) -> bool {
+    let deadline = Duration::from_secs(timeout_secs);
+    let start = std::time::Instant::now();
+
+    while start.elapsed() < deadline {
+        if codex_process_visible() {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    false
+}
+
+pub fn codex_process_visible() -> bool {
+    let Ok(output) = Command::new("tasklist")
+        .args(["/FO", "CSV", "/NH"])
+        .output()
+    else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_lowercase();
+    stdout.contains("codex.exe")
+        || stdout.contains("codex-app.exe")
+        || stdout.contains("\\windowsapps\\openai.codex_")
 }
 
 fn candidate_paths() -> Vec<PathBuf> {
@@ -83,14 +157,7 @@ fn candidate_paths() -> Vec<PathBuf> {
             local.join("OpenAI/Codex"),
             local.join("openai-codex-electron"),
         ] {
-            if let Ok(entries) = std::fs::read_dir(base) {
-                for entry in entries.flatten() {
-                    let app_path = entry.path().join("Codex.exe");
-                    if entry.file_name().to_string_lossy().starts_with("app-") {
-                        paths.push(app_path);
-                    }
-                }
-            }
+            paths.extend(latest_app_bundle_paths(&base));
         }
     }
 
@@ -111,4 +178,47 @@ fn candidate_paths() -> Vec<PathBuf> {
     }
 
     paths
+}
+
+fn latest_app_bundle_paths(base: &Path) -> Vec<PathBuf> {
+    let entries = match std::fs::read_dir(base) {
+        Ok(entries) => entries,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut app_dirs: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("app-"))
+        })
+        .collect();
+
+    app_dirs.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+
+    app_dirs
+        .into_iter()
+        .map(|dir| dir.join("Codex.exe"))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packaged_codex_resource_matches_store_shim() {
+        let path = Path::new(
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_1.2.3.0_x64__8wekyb3d8bbwe\app\resources\codex.exe",
+        );
+        assert!(is_packaged_codex_resource(path));
+    }
+
+    #[test]
+    fn packaged_codex_resource_ignores_standalone_install() {
+        let path = Path::new(r"C:\Users\alice\AppData\Local\Programs\Codex\Codex.exe");
+        assert!(!is_packaged_codex_resource(path));
+    }
 }

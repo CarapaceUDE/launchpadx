@@ -8,7 +8,7 @@ function getInitialTheme(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ variant = "sidebar" }: { variant?: "sidebar" | "card" }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
@@ -25,13 +25,21 @@ export function ThemeToggle() {
   };
 
   const isDark = theme === "dark";
+  const isCard = variant === "card";
 
   return (
     <button
+      type="button"
+      data-testid="theme-toggle"
       onClick={toggle}
       aria-label="Toggle dark mode"
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white/85 transition-colors hover:bg-white/10"
+      className={[
+        "flex w-full items-center justify-between rounded-lg px-3.5 py-2.5 text-sm transition-colors",
+        isCard
+          ? "border border-border bg-card text-foreground hover:bg-muted/70"
+          : "border border-white/10 bg-white/5 text-white/85 hover:bg-white/10",
+      ].join(" ")}
     >
       <span className="flex items-center gap-2">
         {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
@@ -40,7 +48,7 @@ export function ThemeToggle() {
       <span
         className={[
           "relative h-4 w-7 rounded-full transition-colors",
-          isDark ? "bg-success" : "bg-white/25",
+          isDark ? "bg-success" : isCard ? "bg-muted" : "bg-white/25",
         ].join(" ")}
       >
         <span

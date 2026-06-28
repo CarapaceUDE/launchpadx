@@ -39,8 +39,8 @@ impl fmt::Display for LaunchTarget {
 pub enum LauncherError {
     #[error("configured codexCommand was not found: {0}")]
     MissingConfiguredCommand(String),
-    #[error("could not find Codex; set codexCommand in config.json")]
-    CodexNotFound,
+    #[error("could not find Codex ({0}); set codexCommand in config.json to the full path of Codex.exe")]
+    CodexNotFound(String),
     #[error("failed to launch {program}: {source}")]
     Launch {
         program: String,
@@ -62,15 +62,16 @@ pub fn launch_path(
     path: &Path,
     working_directory: &Path,
     args: &[String],
-    base_url: &str,
-    api_key: &str,
+    local_api: Option<(&str, &str)>,
 ) -> Result<(), LauncherError> {
     let mut command = Command::new(path);
-    command
-        .current_dir(working_directory)
-        .args(args)
-        .env("OPENAI_BASE_URL", base_url)
-        .env("OPENAI_API_KEY", api_key);
+    command.current_dir(working_directory).args(args);
+
+    if let Some((base_url, api_key)) = local_api {
+        command
+            .env("OPENAI_BASE_URL", base_url)
+            .env("OPENAI_API_KEY", api_key);
+    }
 
     command.spawn().map_err(|source| LauncherError::Launch {
         program: path.display().to_string(),
@@ -80,7 +81,14 @@ pub fn launch_path(
     Ok(())
 }
 
-pub fn launch_windows_start_app(app_id: &str) -> Result<(), LauncherError> {
+#[cfg(target_os = "windows")]
+pub fn wait_for_codex_process(timeout_secs: u64) -> bool {
+    windows::wait_for_codex_process(timeout_secs)
+}
+
+pub fn launch_windows_start_app(
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] app_id: &str,
+) -> Result<(), LauncherError> {
     #[cfg(target_os = "windows")]
     {
         return windows::launch_start_app(app_id);
@@ -95,12 +103,11 @@ pub fn launch_windows_start_app(app_id: &str) -> Result<(), LauncherError> {
 pub fn launch_macos_bundle(
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] bundle: &Path,
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] working_directory: &Path,
-    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] base_url: &str,
-    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] api_key: &str,
+    #[cfg_attr(not(target_os = "macos"), allow(unused_variables))] local_api: Option<(&str, &str)>,
 ) -> Result<(), LauncherError> {
     #[cfg(target_os = "macos")]
     {
-        return macos::launch_bundle(bundle, working_directory, base_url, api_key);
+        return macos::launch_bundle(bundle, working_directory, local_api);
     }
 
     #[allow(unreachable_code)]
@@ -139,7 +146,9 @@ fn platform_resolve() -> Result<LaunchTarget, LauncherError> {
     }
 
     #[allow(unreachable_code)]
-    Err(LauncherError::CodexNotFound)
+    Err(LauncherError::CodexNotFound(
+        "no platform-specific launcher is available".to_string(),
+    ))
 }
 
 fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError> {
@@ -149,6 +158,10 @@ fn platform_target_for_path(path: PathBuf) -> Result<LaunchTarget, LauncherError
             if let Some(app_id) = windows::start_app_id() {
                 return Ok(LaunchTarget::WindowsStartApp { app_id });
             }
+            return Err(LauncherError::Platform(format!(
+                "codexCommand points to the Microsoft Store Codex shim ({}), which Windows blocks from direct launch. Could not find a Codex Start menu AppID — reinstall Codex from the Microsoft Store or set codexCommand to a full path such as %LOCALAPPDATA%\\Programs\\Codex\\Codex.exe",
+                path.display()
+            )));
         }
     }
 
@@ -193,6 +206,7 @@ fn first_existing(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
     paths.into_iter().find(|path| path.exists())
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 fn common_path_commands() -> &'static [&'static str] {
     &["codex-app", "codex"]
 }

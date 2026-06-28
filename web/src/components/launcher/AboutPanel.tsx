@@ -1,21 +1,34 @@
-import { Github, Globe, Rocket } from "lucide-react";
+import { Github, Globe, Heart, MessageCircle } from "lucide-react";
+import { AppIcon } from "./AppIcon";
+import {
+  APP_NAME,
+  LICENSE_NOTICE,
+  LICENSE_URL,
+  ORG_DISCORD,
+  ORG_GITHUB,
+  ORG_PATREON,
+  ORG_TAGLINE,
+  ORG_WEBSITE,
+  TRADEMARK_NOTICE,
+} from "../../lib/branding";
 
 export function AboutPanel() {
   return (
     <div className="card-surface p-6">
       <div className="space-y-4 text-center">
         <div className="mb-3 flex items-center justify-center">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-            <Rocket className="h-6 w-6 text-primary" />
+          <div className="h-12 w-12 overflow-hidden rounded-xl ring-1 ring-primary/20">
+            <AppIcon size={48} className="h-full w-full" />
           </div>
         </div>
-        <h3 className="text-[16px] font-semibold text-foreground">Codex Local Launcher</h3>
+        <h3 className="text-[16px] font-semibold text-foreground">{APP_NAME}</h3>
+        <p className="text-[12px] text-muted-foreground">{ORG_TAGLINE}</p>
         <p className="text-[12px] text-muted-foreground">Version 0.1.0</p>
       </div>
 
       <div className="mt-4 space-y-2">
         <a
-          href="https://github.com/CarapaceUDE/codex-launchpad"
+          href={ORG_GITHUB}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 rounded-lg bg-primary/10 p-3 py-2.5 text-sm text-primary transition-colors hover:bg-primary/15"
@@ -24,13 +37,31 @@ export function AboutPanel() {
           View on GitHub
         </a>
         <a
-          href="https://carapaceai.org"
+          href={ORG_WEBSITE}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 rounded-lg border border-border p-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
         >
           <Globe className="h-4 w-4" />
           CarapaceAI
+        </a>
+        <a
+          href={ORG_PATREON}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 rounded-lg border border-border p-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
+        >
+          <Heart className="h-4 w-4" />
+          Official Builds (Patreon)
+        </a>
+        <a
+          href={ORG_DISCORD}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 rounded-lg border border-border p-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Join Community
         </a>
       </div>
 
@@ -55,8 +86,16 @@ export function AboutPanel() {
       </div>
 
       <div className="mt-4 border-t border-border pt-3 text-[10px] text-muted-foreground">
-        <p>Built with React, Tailwind CSS, and Rust.</p>
-        <p className="mt-1">Licensed under MIT.</p>
+        <p>
+          <a
+            href={LICENSE_URL}
+            className="text-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
+          >
+            {LICENSE_NOTICE}
+          </a>
+        </p>
+        <p className="mt-1">Built with React, Tailwind CSS, and Rust.</p>
+        <p className="mt-2 leading-relaxed">{TRADEMARK_NOTICE}</p>
       </div>
     </div>
   );

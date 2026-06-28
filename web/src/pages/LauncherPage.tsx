@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LauncherConfig, ModelInfo } from "../types";
 import {
   useLauncher,
@@ -7,35 +7,41 @@ import {
   type CodexConfigForm,
 } from "../context/LauncherContext";
 import { Sidebar } from "../components/launcher/Sidebar";
-import { LaunchPanel } from "../components/launcher/LaunchPanel";
-import { CodexProfileBar } from "../components/launcher/CodexProfileBar";
-import { EndpointCard } from "../components/launcher/EndpointCard";
-import { GeneralSettingsCard } from "../components/launcher/GeneralSettingsCard";
+import { ProviderModeCard } from "../components/launcher/ProviderModeCard";
+import { ProviderSettingsPanel } from "../components/launcher/ProviderSettingsPanel";
 import { ModelsPanel } from "../components/launcher/ModelsPanel";
-import { SettingsPanel } from "../components/launcher/SettingsPanel";
 import { LogsPanel } from "../components/launcher/LogsPanel";
 import { AboutPanel } from "../components/launcher/AboutPanel";
 import { ModelDetailsModal } from "../components/launcher/ModelDetailsModal";
 import { buildOpenAiBaseUrl } from "../lib/endpoint";
+import { reconcileModelSelection } from "../lib/modelSelection";
+import { activeProviderMode, type ProviderMode } from "../lib/codexProfile";
+import { canStartCodex, localActivationRequirements } from "../lib/providerGuards";
+import { APP_NAME } from "../lib/branding";
 
 export function LauncherPage() {
   const {
-    running,
-    isLaunching,
     statusMessage,
+    statusVariant,
+    operation,
+    serverState,
     models,
     config,
     refreshing,
     launch,
     stop,
-    writeCodexConfig,
-    revertCodexConfig,
+    switchProvider,
     refreshModels,
     updateConfig,
-    openDirectoryPicker,
+    selectModel,
+    setAutoStart,
+    codexProfile,
+    writingCodex,
+    revertingCodex,
   } = useLauncher();
 
   const [activeNav, setActiveNav] = useState<NavKey>("launcher");
+  const [settingsProvider, setSettingsProvider] = useState<ProviderMode>("local");
   const [detailsModel, setDetailsModel] = useState<ModelInfo | null>(null);
   const [codexForm, setCodexForm] = useState<CodexConfigForm>(configToCodexForm({}));
 
@@ -51,19 +57,21 @@ export function LauncherPage() {
   const autoStart = Boolean(config.autoStart);
   const workingDir = config.workingDirectory ?? "";
   const apiKey = config.apiKey ?? "";
-  const selectedModel = config.codexModel ?? "";
   const modelNames = models.map((m) => m.name);
+  const selectedModel = reconcileModelSelection(modelNames, config.codexModel) ?? "";
+  const baseUrl = buildOpenAiBaseUrl(ip, parseInt(port, 10) || 11434, scheme);
 
-  const canStart = Boolean(ip && port && selectedModel);
-  const canWrite = Boolean(config.ollamaIp && config.codexModel);
-  const startBlockedReason = !selectedModel
-    ? models.length === 0
-      ? "Refresh models from your endpoint, then select one above to enable Start."
-      : "Select a model above to enable Start."
-    : undefined;
-  const providerLabel = config.persistCodexConfig === true
-          ? (config.codexProviderName || "OpenAI")
-          : "Default";
+  const providerMode = activeProviderMode(codexProfile);
+  const switchingProvider = writingCodex || revertingCodex;
+  const switchingTo = writingCodex ? "local" : revertingCodex ? "codex" : null;
+
+  const localReq = localActivationRequirements(config, models.length);
+  const canActivateLocal = localReq.ok;
+  const localBlockedReason = localReq.ok ? undefined : localReq.message;
+
+  const startCheck = canStartCodex(providerMode, config, models.length);
+  const canStart = startCheck.canStart;
+  const startBlockedReason = startCheck.reason;
 
   const handleEndpointChange = useCallback(
     (patch: { ip?: string; port?: string; scheme?: "http" | "https" }) => {
@@ -75,23 +83,10 @@ export function LauncherPage() {
       if (patch.port !== undefined) updateConfig("ollamaPort", nextPort);
       if (patch.scheme !== undefined) updateConfig("ollamaScheme", patch.scheme);
 
-      const baseUrl = buildOpenAiBaseUrl(nextIp, nextPort, nextScheme);
-      if (baseUrl) updateConfig("openaiBaseUrl", baseUrl);
+      const nextBaseUrl = buildOpenAiBaseUrl(nextIp, nextPort, nextScheme);
+      if (nextBaseUrl) updateConfig("openaiBaseUrl", nextBaseUrl);
     },
     [ip, port, scheme, updateConfig],
-  );
-
-  const handleBrowseDir = useCallback(async () => {
-    const path = await openDirectoryPicker();
-    if (path) updateConfig("workingDirectory", path);
-  }, [openDirectoryPicker, updateConfig]);
-
-  const handleViewDetails = useCallback(
-    (name: string) => {
-      const model = models.find((m) => m.name === name);
-      if (model) setDetailsModel(model);
-    },
-    [models],
   );
 
   const handleCodexFormChange = useCallback(
@@ -125,82 +120,94 @@ export function LauncherPage() {
     [updateConfig],
   );
 
+  const openProviderSettings = useCallback((mode: ProviderMode) => {
+    setSettingsProvider(mode);
+    setActiveNav("settings");
+  }, []);
+
+  const handleNavChange = useCallback((nav: NavKey) => {
+    if (nav === "settings") {
+      setSettingsProvider("local");
+    }
+    setActiveNav(nav);
+  }, []);
+
+  const endpointPreview = useMemo(() => baseUrl || undefined, [baseUrl]);
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-background md:flex-row">
       <Sidebar
-        running={running}
-        statusMessage={statusMessage}
         modelCount={models.length}
+        refreshing={refreshing}
         onRefresh={refreshModels}
         activeNav={activeNav}
-        onNavChange={setActiveNav}
+        onNavChange={handleNavChange}
       />
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1100px] p-6">
+      <main className="themed-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+        <div className="mx-auto w-full max-w-[1100px] p-4 sm:p-6">
           {activeNav === "launcher" ? (
             <div className="space-y-5">
-              <header className="mb-1">
-                <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Launcher</h1>
+              <header className="mb-1" data-testid="page-launcher">
+                <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{APP_NAME}</h1>
                 <p className="text-[13px] text-muted-foreground">
-                  Manage your local Codex server and model configuration.
+                  Configure Codex, pick a model provider, and run Codex from one place.
                 </p>
               </header>
 
-              <div className="space-y-3">
-                <LaunchPanel
-                  running={running}
-                  onToggle={running ? stop : launch}
-                  canStart={canStart}
-                  startBlockedReason={startBlockedReason}
-                  statusStripText={statusMessage}
-                  models={modelNames}
-                  selectedModel={selectedModel}
-                  onSelectModel={(v) => updateConfig("codexModel", v)}
-                  onRefreshModels={refreshModels}
-                  refreshing={refreshing}
-                  onViewModelDetails={handleViewDetails}
-                  modelStatusHint={statusMessage}
-                  isLaunching={isLaunching}
-                  providerLabel={providerLabel}
-                />
-
-                <CodexProfileBar
-                  onWrite={writeCodexConfig}
-                  onRevert={revertCodexConfig}
-                  canWrite={canWrite}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <EndpointCard
-                  ip={ip}
-                  port={port}
-                  scheme={scheme}
-                  onChange={handleEndpointChange}
-                  onRefresh={refreshModels}
-                  refreshing={refreshing}
-                />
-                <GeneralSettingsCard
-                  autoStart={autoStart}
-                  onAutoStartChange={(v) => updateConfig("autoStart", v)}
-                  workingDir={workingDir}
-                  onWorkingDirChange={(v) => updateConfig("workingDirectory", v)}
-                  onBrowseDir={handleBrowseDir}
-                  apiKey={apiKey}
-                  onApiKeyChange={(v) => updateConfig("apiKey", v)}
-                  codexConfig={codexForm}
-                  onCodexConfigChange={handleCodexFormChange}
-                />
-              </div>
-
+              <ProviderModeCard
+                profile={codexProfile}
+                activeMode={providerMode}
+                canActivateLocal={canActivateLocal}
+                localBlockedReason={localBlockedReason}
+                switching={switchingProvider}
+                switchingTo={switchingTo}
+                onSelectMode={(mode) => void switchProvider(mode)}
+                onOpenProviderSettings={openProviderSettings}
+                endpointPreview={endpointPreview}
+                modelPreview={selectedModel || undefined}
+                models={modelNames}
+                selectedModel={selectedModel}
+                onSelectModel={(v) => void selectModel(v)}
+                onRefreshModels={refreshModels}
+                refreshing={refreshing}
+                selectingModel={operation === "selecting_model"}
+                serverState={serverState}
+                operation={operation}
+                onToggleLaunch={serverState === "running" ? stop : launch}
+                canStart={canStart}
+                startBlockedReason={startBlockedReason}
+                statusStripText={statusMessage}
+                statusVariant={statusVariant}
+              />
             </div>
           ) : (
             <div className="mt-2">
               {activeNav === "models" && (
                 <ModelsPanel modelCount={models.length} onRefresh={refreshModels} />
               )}
-              {activeNav === "settings" && <SettingsPanel />}
+              {activeNav === "settings" && (
+                <ProviderSettingsPanel
+                  provider={settingsProvider}
+                  onProviderChange={setSettingsProvider}
+                  autoStart={autoStart}
+                  onAutoStartChange={(v) => void setAutoStart(v)}
+                  workingDir={workingDir}
+                  onWorkingDirChange={(v) => updateConfig("workingDirectory", v)}
+                  ip={ip}
+                  port={port}
+                  scheme={scheme}
+                  onEndpointChange={handleEndpointChange}
+                  baseUrl={baseUrl || "—"}
+                  apiKey={apiKey}
+                  onApiKeyChange={(v) => updateConfig("apiKey", v)}
+                  codexConfig={codexForm}
+                  onCodexConfigChange={handleCodexFormChange}
+                  onRefreshModels={refreshModels}
+                  refreshing={refreshing}
+                  modelCount={models.length}
+                />
+              )}
               {activeNav === "logs" && <LogsPanel />}
               {activeNav === "about" && <AboutPanel />}
             </div>

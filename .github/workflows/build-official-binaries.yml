@@ -1,0 +1,135 @@
+name: Build Official Binaries
+
+# Private build artifacts for Patreon distribution.
+# Does NOT attach binaries to the public GitHub Release.
+concurrency:
+  group: official-binaries-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build (e.g. v0.1.0)"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: codex-launchpad
+            artifact_ext: .exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: codex-launchpad
+            artifact_ext: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: codex-launchpad-aarch64
+            artifact_ext: ""
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact_name: codex-launchpad
+            artifact_ext: ""
+          - os: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
+            artifact_name: codex-launchpad-aarch64
+            artifact_ext: ""
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build web UI
+        working-directory: web
+        run: npm ci && npm run build
+
+      - name: Install Linux GUI dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            pkg-config \
+            gcc-aarch64-linux-gnu
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.os }}-cargo-
+
+      - name: Build (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo build --release --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Build (macOS)
+        if: matrix.os == 'macos-latest'
+        run: cargo build --release --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Build (Linux x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: cargo build --release --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Build (Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          cargo build --release --target ${{ matrix.target }} --target-dir target-aarch64
+          mkdir -p target/aarch64-unknown-linux-gnu/release
+          mv target-aarch64/aarch64-unknown-linux-gnu/release/codex-launchpad target/aarch64-unknown-linux-gnu/release/codex-launchpad
+        shell: bash
+
+      - name: Prepare artifact
+        id: artifact
+        run: |
+          bin_path="target/${{ matrix.target }}/release/codex-launchpad${{ matrix.artifact_ext }}"
+          if [ "${{ matrix.artifact_ext }}" = ".exe" ]; then
+            artifact="${{ matrix.artifact_name }}-${{ matrix.target }}.exe"
+          else
+            artifact="${{ matrix.artifact_name }}-${{ matrix.target }}"
+          fi
+          cp "$bin_path" "$artifact"
+          echo "file=$artifact" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-${{ matrix.target }}
+          path: ${{ steps.artifact.outputs.file }}
+          retention-days: 14

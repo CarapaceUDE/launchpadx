@@ -8,12 +8,8 @@ export function ModelsPanel({
   modelCount: number;
   onRefresh: () => void;
 }) {
-  const { models, config, refreshing, updateConfig } = useLauncher();
+  const { models, config, refreshing, selectModel } = useLauncher();
   const selected = config.codexModel ?? "";
-
-  const selectModel = (name: string) => {
-    updateConfig("codexModel", name);
-  };
 
   return (
     <div className="card-surface space-y-4 p-6">
@@ -36,13 +32,13 @@ export function ModelsPanel({
           </p>
         </div>
       ) : (
-        <div className="max-h-[300px] space-y-1 overflow-y-auto pr-1">
+        <div className="themed-scrollbar max-h-[300px] space-y-1 overflow-y-auto pr-1">
           {models.map((model) => {
             const isSelected = model.name === selected;
             return (
               <div
                 key={model.name}
-                onClick={() => selectModel(model.name)}
+                onClick={() => void selectModel(model.name)}
                 className={[
                   "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[13px] transition-colors",
                   isSelected

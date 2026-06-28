@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { SlidersHorizontal, FolderOpen, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
+import { SlidersHorizontal, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Card, FormField, TextInput, ToggleRow } from "./primitives";
 import type { CodexConfigForm } from "../../context/LauncherContext";
+import { APP_NAME } from "../../lib/branding";
 
 export function GeneralSettingsCard({
   autoStart,
   onAutoStartChange,
   workingDir,
   onWorkingDirChange,
-  onBrowseDir,
   apiKey,
   onApiKeyChange,
   codexConfig,
@@ -18,7 +18,6 @@ export function GeneralSettingsCard({
   onAutoStartChange: (v: boolean) => void;
   workingDir: string;
   onWorkingDirChange: (v: string) => void;
-  onBrowseDir: () => void;
   apiKey: string;
   onApiKeyChange: (v: string) => void;
   codexConfig: CodexConfigForm;
@@ -40,29 +39,22 @@ export function GeneralSettingsCard({
           description="Launch the server when this app opens"
           checked={autoStart}
           onChange={onAutoStartChange}
+          testId="auto-start-toggle"
         />
 
-        <FormField label="Working Directory">
-          <div className="flex gap-2">
-            <TextInput
-              value={workingDir}
-              onChange={(e) => onWorkingDirChange(e.target.value)}
-              placeholder="~/projects"
-            />
-            <button
-              type="button"
-              onClick={onBrowseDir}
-              className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/70"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-              Browse
-            </button>
-          </div>
+        <FormField label="Working Directory" hint="Enter an absolute path to the project directory">
+          <TextInput
+            data-testid="working-directory"
+            value={workingDir}
+            onChange={(e) => onWorkingDirChange(e.target.value)}
+            placeholder="C:\projects\my-app"
+          />
         </FormField>
 
         <FormField label="API Key (optional)">
           <div className="relative">
             <TextInput
+              data-testid="api-key"
               type={showKey ? "text" : "password"}
               value={apiKey}
               onChange={(e) => onApiKeyChange(e.target.value)}
@@ -81,7 +73,7 @@ export function GeneralSettingsCard({
             <p className="mt-1.5 text-[12px] text-warning-fg">{apiKeyWarning}</p>
           )}
           <p className="mt-1.5 text-[12px] text-muted-foreground">
-            Stored locally in <code>config.json</code>. The launcher redacts this value in diagnostics and logs.
+            Stored locally in <code>config.json</code>. {APP_NAME} redacts this value in diagnostics and logs.
           </p>
         </FormField>
 
@@ -107,14 +99,14 @@ export function GeneralSettingsCard({
                   <TextInput
                     value={codexConfig.codexProviderId}
                     onChange={(e) => onCodexConfigChange({ codexProviderId: e.target.value })}
-                    placeholder="codex-local-launcher"
+                    placeholder="codex-launchpad"
                   />
                 </FormField>
                 <FormField label="Provider Name">
                   <TextInput
                     value={codexConfig.codexProviderName}
                     onChange={(e) => onCodexConfigChange({ codexProviderName: e.target.value })}
-                    placeholder="Codex Local Launcher"
+                    placeholder="Codex Launchpad"
                   />
                 </FormField>
                 <FormField label="Codex Config Path">
@@ -143,7 +135,7 @@ export function GeneralSettingsCard({
                   <select
                     value={codexConfig.codexApiScheme}
                     onChange={(e) => onCodexConfigChange({ codexApiScheme: e.target.value })}
-                    className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                    className="themed-native-select h-[38px] w-full px-3 text-sm focus:ring-4"
                   >
                     <option value="http">http</option>
                     <option value="https">https</option>
@@ -161,7 +153,7 @@ export function GeneralSettingsCard({
                 <select
                   value={codexConfig.codexApiKeyMode}
                   onChange={(e) => onCodexConfigChange({ codexApiKeyMode: e.target.value })}
-                  className="h-[38px] w-full appearance-none rounded-md border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                  className="themed-native-select h-[38px] w-full px-3 text-sm focus:ring-4"
                 >
                   <option value="envKey">Environment Variable</option>
                   <option value="experimentalBearerToken">Experimental Bearer Token</option>

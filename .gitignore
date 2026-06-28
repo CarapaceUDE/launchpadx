@@ -11,16 +11,27 @@ config.json
 
 # Node modules
 node_modules/
+web/node_modules/
 
 # Build output
 web/dist/
+
+# Playwright artifacts
+web/playwright-report/
+web/test-results/
+web/blob-report/
+web/e2e/fixtures/backups/
 
 # Temporary workspace data
 /.tmp/
 /tmp/
 
+# Local-only release automation (not shared)
+scripts/local/
+
 # Local/session artifacts (not part of the app)
 agent-tools/
+codex-launchpad/
 codex-launchpad-src/
 mcps/
 
