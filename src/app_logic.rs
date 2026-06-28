@@ -421,10 +421,13 @@ fn detect_codex_by_name() -> Option<CodexProcessInfo> {
             "codex.ps1",
         ];
         for &name in &binary_names {
-            let output = Command::new("tasklist")
+            let output = match Command::new("tasklist")
                 .args(["/FI", &format!("IMAGENAME eq {name}"), "/FO", "CSV", "/NH"])
                 .output()
-                .ok()?;
+            {
+                Ok(o) => o,
+                Err(_) => continue,
+            };
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if stdout.contains(name) {

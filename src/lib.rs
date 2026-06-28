@@ -1,7 +1,7 @@
 pub mod acp_client;
 pub mod app_logic;
-pub mod build_check;
 pub mod branding;
+pub mod build_check;
 pub mod codex_config;
 pub mod codex_process;
 pub mod config;

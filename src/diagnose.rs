@@ -37,10 +37,7 @@ pub fn run(config_path: &Path, project_root: &Path) -> Result<(), Box<dyn std::e
     println!("Working directory : {}", working_directory.display());
     println!(
         "Codex command     : {}",
-        config
-            .codex_command()
-            .as_deref()
-            .unwrap_or("(auto-detect)")
+        config.codex_command().as_deref().unwrap_or("(auto-detect)")
     );
     println!("Codex launch probe: {}", codex_launch_probe(&config));
 
@@ -145,11 +142,14 @@ fn find_launcher_binary(project_root: &Path) -> Option<PathBuf> {
         project_root.join("target/debug").join(binary_name),
     ];
 
-    candidates.into_iter().find(|path| path.is_file()).or_else(|| {
-        std::env::current_exe()
-            .ok()
-            .filter(|path| path.file_name().is_some_and(|name| name == binary_name))
-    })
+    candidates
+        .into_iter()
+        .find(|path| path.is_file())
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .filter(|path| path.file_name().is_some_and(|name| name == binary_name))
+        })
 }
 
 fn format_configured_secret(value: Option<&str>) -> &'static str {
@@ -163,9 +163,7 @@ fn format_configured_secret(value: Option<&str>) -> &'static str {
 }
 
 fn probe_http(name: &str, url: &str, api_key: Option<&str>) -> CheckResult {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build();
+    let client = Client::builder().timeout(Duration::from_secs(5)).build();
 
     let Ok(client) = client else {
         return CheckResult {
@@ -233,6 +231,9 @@ mod tests {
             format_configured_secret(Some("replace-with-your-api-key")),
             "(not set)"
         );
-        assert_eq!(format_configured_secret(Some("sk-test")), "Configured (redacted)");
+        assert_eq!(
+            format_configured_secret(Some("sk-test")),
+            "Configured (redacted)"
+        );
     }
 }
