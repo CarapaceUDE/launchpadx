@@ -14,13 +14,10 @@ pub fn run(project_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
         "codex-launchpad"
     };
 
-    let bin_path = project_root
-        .join("target/release")
-        .join(binary_name);
+    let bin_path = project_root.join("target/release").join(binary_name);
     let src_dir = project_root.join("src");
     let web_src = project_root.join("web/src");
-    let web_dist_bundle = project_root
-        .join("web/dist/assets/index.js");
+    let web_dist_bundle = project_root.join("web/dist/assets/index.js");
 
     if !bin_path.is_file() {
         println!("Release binary not found, building...");

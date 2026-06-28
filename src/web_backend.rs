@@ -425,15 +425,13 @@ pub fn launch_web_gui(
 
     gui_log!(Some(root.as_path()), "INFO", "Running event loop");
     let _pid_file = codex_process::CodexProcess::spawn_pid_file_path(&root);
-    event_loop.run(move |event, _, control_flow| {
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                    ..
-             } => *control_flow = ControlFlow::Exit,
-              _ => *control_flow = ControlFlow::Wait,
-          }
-      });
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::WindowEvent {
+            event: WindowEvent::CloseRequested,
+            ..
+        } => *control_flow = ControlFlow::Exit,
+        _ => *control_flow = ControlFlow::Wait,
+    });
 }
 
 fn start_server(

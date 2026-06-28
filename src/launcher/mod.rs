@@ -39,7 +39,9 @@ impl fmt::Display for LaunchTarget {
 pub enum LauncherError {
     #[error("configured codexCommand was not found: {0}")]
     MissingConfiguredCommand(String),
-    #[error("could not find Codex ({0}); set codexCommand in config.json to the full path of Codex.exe")]
+    #[error(
+        "could not find Codex ({0}); set codexCommand in config.json to the full path of Codex.exe"
+    )]
     CodexNotFound(String),
     #[error("failed to launch {program}: {source}")]
     Launch {

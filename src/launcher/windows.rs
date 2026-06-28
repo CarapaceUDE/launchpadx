@@ -40,18 +40,13 @@ pub fn resolve() -> Result<LaunchTarget, LauncherError> {
 pub fn launch_start_app(app_id: &str) -> Result<(), LauncherError> {
     let target = format!("shell:AppsFolder\\{app_id}");
 
-    let launched = Command::new("explorer.exe")
-        .arg(&target)
-        .spawn()
-        .is_ok()
-        || launch_via_powershell(&target);
+    let launched =
+        Command::new("explorer.exe").arg(&target).spawn().is_ok() || launch_via_powershell(&target);
 
     if !launched {
         return Err(LauncherError::Launch {
             program: target.clone(),
-            source: std::io::Error::other(
-                "explorer.exe and PowerShell Start-Process both failed",
-            ),
+            source: std::io::Error::other("explorer.exe and PowerShell Start-Process both failed"),
         });
     }
 
@@ -90,10 +85,7 @@ $apps | Select-Object -First 1 -ExpandProperty AppID
 }
 
 fn launch_via_powershell(target: &str) -> bool {
-    let script = format!(
-        "Start-Process -FilePath '{}'",
-        target.replace('\'', "''")
-    );
+    let script = format!("Start-Process -FilePath '{}'", target.replace('\'', "''"));
     Command::new("powershell.exe")
         .args(["-NoProfile", "-Command", &script])
         .spawn()
