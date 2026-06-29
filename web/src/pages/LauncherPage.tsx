@@ -18,6 +18,7 @@ import { reconcileModelSelection } from "../lib/modelSelection";
 import { activeProviderMode, type ProviderMode } from "../lib/codexProfile";
 import { canStartCodex, localActivationRequirements } from "../lib/providerGuards";
 import { APP_NAME } from "../lib/branding";
+import { ConnectionBanner } from "../components/launcher/ConnectionBanner";
 import { FailoverBanner } from "../components/launcher/FailoverBanner";
 
 export function LauncherPage() {
@@ -42,6 +43,7 @@ export function LauncherPage() {
     failoverStatus,
     failoverToLocal,
     dismissFailoverAlert,
+    dismissConnectionAlert,
     copyResumePrompt,
   } = useLauncher();
 
@@ -159,6 +161,16 @@ export function LauncherPage() {
                   Configure Codex, pick a model provider, and run Codex from one place.
                 </p>
               </header>
+
+              {failoverStatus.activeConnectionAlert &&
+              !failoverStatus.activeConnectionAlert.dismissed ? (
+                <ConnectionBanner
+                  alert={failoverStatus.activeConnectionAlert}
+                  busy={refreshing}
+                  onRefreshEndpoint={() => void refreshModels()}
+                  onDismiss={() => void dismissConnectionAlert()}
+                />
+              ) : null}
 
               {failoverStatus.activeAlert && !failoverStatus.activeAlert.dismissed ? (
                 <FailoverBanner

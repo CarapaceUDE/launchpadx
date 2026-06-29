@@ -5,6 +5,7 @@ pub mod build_check;
 pub mod codex_config;
 pub mod codex_monitor;
 pub mod codex_process;
+pub mod connection_watch;
 pub mod config;
 pub mod diagnose;
 pub mod failover;

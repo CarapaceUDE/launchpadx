@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
 import { useLauncher, type LogEntry } from "../../context/LauncherContext";
 
-function isRateLimitWatch(message: string) {
-  return message.includes("RATE_LIMIT_WATCH");
+function isWatchLog(message: string) {
+  return message.includes("RATE_LIMIT_WATCH") || message.includes("CONNECTION_WATCH");
 }
 
 function levelColor(level: string, message: string) {
-  if (isRateLimitWatch(message)) return "text-amber-400";
+  if (isWatchLog(message)) return "text-amber-400";
   switch (level.toUpperCase()) {
     case "ERROR":
       return "text-red-500";
@@ -21,7 +21,7 @@ function levelColor(level: string, message: string) {
 }
 
 function levelBg(level: string, message: string) {
-  if (isRateLimitWatch(message)) return "bg-amber-500/15";
+  if (isWatchLog(message)) return "bg-amber-500/15";
   switch (level.toUpperCase()) {
     case "ERROR":
       return "bg-red-500/10";
@@ -71,8 +71,8 @@ export function LogsPanel() {
         <div>
           <h3 className="text-[14px] font-semibold text-foreground">Application Logs</h3>
           <p className="text-[11px] text-muted-foreground">
-            Rate-limit discovery writes highlighted <code className="text-[10px]">RATE_LIMIT_WATCH</code> entries here and to{" "}
-            <code className="text-[10px]">rate-limit-discovery.jsonl</code> automatically.
+            Watch logs use highlighted <code className="text-[10px]">RATE_LIMIT_WATCH</code> and{" "}
+            <code className="text-[10px]">CONNECTION_WATCH</code> entries (also saved to JSONL discovery files).
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -68,6 +68,7 @@ export interface CodexRpcClient {
   setAutoStart(enabled: boolean): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
   getFailoverStatus(): Promise<LauncherResponse<FailoverStatus>>;
   dismissFailoverAlert(): Promise<LauncherResponse<{ ok?: boolean }>>;
+  dismissConnectionAlert(): Promise<LauncherResponse<{ ok?: boolean }>>;
   failoverToLocal(
     profileName?: string,
   ): Promise<
@@ -141,6 +142,7 @@ export function createCodexRpcClient(): CodexRpcClient {
     setAutoStart: (enabled) => call("setAutoStart", { enabled }),
     getFailoverStatus: () => call("getFailoverStatus"),
     dismissFailoverAlert: () => call("dismissFailoverAlert"),
+    dismissConnectionAlert: () => call("dismissConnectionAlert"),
     failoverToLocal: (profileName) =>
       call("failoverToLocal", profileName ? { profileName } : {}),
     captureSessionCheckpoint: (trigger) =>

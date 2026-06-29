@@ -42,6 +42,7 @@ interface CodexIPC {
     setAutoStart(enabled: boolean): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
     getFailoverStatus(): Promise<LauncherResponse<FailoverStatus>>;
     dismissFailoverAlert(): Promise<LauncherResponse<{ ok?: boolean }>>;
+    dismissConnectionAlert(): Promise<LauncherResponse<{ ok?: boolean }>>;
     failoverToLocal(profileName?: string): Promise<LauncherResponse<{ ok?: boolean; message?: string; profileName?: string; resumePrompt?: string; checkpoint?: SessionCheckpoint }>>;
     captureSessionCheckpoint(trigger?: string): Promise<LauncherResponse<{ ok?: boolean; checkpoint?: SessionCheckpoint | null }>>;
     listSessionCheckpoints(): Promise<LauncherResponse<{ checkpoints: SessionCheckpoint[] }>>;

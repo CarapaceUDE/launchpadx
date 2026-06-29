@@ -87,6 +87,7 @@ interface LauncherContextValue extends LauncherState {
   refreshFailoverStatus: () => Promise<void>;
   failoverToLocal: (profileName?: string) => Promise<void>;
   dismissFailoverAlert: () => Promise<void>;
+  dismissConnectionAlert: () => Promise<void>;
   copyResumePrompt: () => Promise<void>;
 }
 
@@ -547,6 +548,20 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       setState((prev) => ({
         ...prev,
         statusMessage: `Could not dismiss failover alert: ${msg}`,
+        statusVariant: "error",
+      }));
+    }
+  }, [refreshFailoverStatus]);
+
+  const dismissConnectionAlert = useCallback(async () => {
+    try {
+      await window.codexRPC.dismissConnectionAlert();
+      await refreshFailoverStatus();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState((prev) => ({
+        ...prev,
+        statusMessage: `Could not dismiss connection alert: ${msg}`,
         statusVariant: "error",
       }));
     }
@@ -1053,6 +1068,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     refreshFailoverStatus,
     failoverToLocal,
     dismissFailoverAlert,
+    dismissConnectionAlert,
     copyResumePrompt,
   };
 

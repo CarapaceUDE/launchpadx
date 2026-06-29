@@ -8,7 +8,11 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::json;
 
+use crate::codex_process::{CodexProcess, CodexProcessInfo};
 use crate::config::LauncherConfig;
+use crate::connection_watch::{
+    self, ConnectionAlert, ConnectionAlertKind, EndpointHealth,
+};
 use crate::failover;
 use crate::rate_limit_watch;
 use crate::session_checkpoint::{self, ProviderModeKind, SessionCheckpoint};
@@ -35,6 +39,12 @@ pub struct CodexMonitorStatus {
     pub recent_alerts: Vec<RateLimitAlert>,
     pub last_checkpoint: Option<SessionCheckpoint>,
     pub discovery_log_hint: String,
+    pub active_connection_alert: Option<ConnectionAlert>,
+    pub recent_connection_alerts: Vec<ConnectionAlert>,
+    pub endpoint_health: Option<EndpointHealth>,
+    pub codex_api_ready: bool,
+    pub endpoint_reachable: bool,
+    pub connection_log_hint: String,
 }
 
 #[derive(Debug)]
@@ -44,6 +54,9 @@ pub struct CodexMonitor {
     status: CodexMonitorStatus,
     poll_count: u64,
     last_session_fingerprints: HashMap<String, String>,
+    last_codex_api_ready: Option<bool>,
+    last_endpoint_reachable: Option<bool>,
+    last_codex_running: Option<bool>,
 }
 
 impl CodexMonitor {
@@ -59,10 +72,19 @@ impl CodexMonitor {
                 active_alert: None,
                 recent_alerts: Vec::new(),
                 last_checkpoint: None,
-                discovery_log_hint: discovery_hint(),
+                discovery_log_hint: rate_limit_discovery_hint(),
+                active_connection_alert: None,
+                recent_connection_alerts: Vec::new(),
+                endpoint_health: None,
+                codex_api_ready: false,
+                endpoint_reachable: false,
+                connection_log_hint: connection_discovery_hint(),
             },
             poll_count: 0,
             last_session_fingerprints: HashMap::new(),
+            last_codex_api_ready: None,
+            last_endpoint_reachable: None,
+            last_codex_running: None,
         }
     }
 
@@ -75,6 +97,13 @@ impl CodexMonitor {
             alert.dismissed = true;
         }
         self.status.active_alert = None;
+    }
+
+    pub fn dismiss_connection_alert(&mut self) {
+        if let Some(alert) = self.status.active_connection_alert.as_mut() {
+            alert.dismissed = true;
+        }
+        self.status.active_connection_alert = None;
     }
 
     pub fn set_last_checkpoint(&mut self, checkpoint: SessionCheckpoint) {
@@ -99,20 +128,29 @@ impl CodexMonitor {
         };
 
         let settings = failover::failover_settings(&config);
+        let provider_mode = session_checkpoint::provider_mode_from_config(&config);
         self.status.auto_switch = settings.auto_switch;
         self.status.watching = true;
         self.status.last_poll_at = Some(Utc::now());
-        self.status.discovery_log_hint = discovery_hint();
-
-        if session_checkpoint::provider_mode_from_config(&config) == ProviderModeKind::LocalApi {
-            self.status.watching = false;
-            return;
-        }
+        self.status.discovery_log_hint = rate_limit_discovery_hint();
+        self.status.connection_log_hint = connection_discovery_hint();
 
         let process = crate::app_logic::detect_codex_process(&config, &self.root);
-        let api_ready = process.running && crate::app_logic::codex_api_ready(&config);
+        let codex_api_ready =
+            process.running && crate::app_logic::codex_api_ready(&config);
 
-        if self.poll_count.is_multiple_of(6) {
+        self.poll_connection_health(&config, &process, provider_mode, codex_api_ready);
+
+        if process.running && codex_api_ready {
+            self.poll_session_watch(
+                &config,
+                &process,
+                &settings,
+                provider_mode == ProviderModeKind::CodexAccount,
+            );
+        }
+
+        if provider_mode == ProviderModeKind::CodexAccount && self.poll_count.is_multiple_of(6) {
             rate_limit_watch::log_event(
                 Some(self.root.as_path()),
                 "INFO",
@@ -120,20 +158,157 @@ impl CodexMonitor {
                 json!({
                     "providerMode": "codexAccount",
                     "codexRunning": process.running,
-                    "codexApiReady": api_ready,
+                    "codexApiReady": codex_api_ready,
                     "codexPid": process.pid,
                     "codexDetectMethod": process.method,
                     "pollCount": self.poll_count,
                     "codexApiBaseUrl": config.codex_api_base_url(),
-                    "codexApiProbe": failover::probe_codex_api(&config),
+                    "codexApiProbe": connection_watch::probe_codex_api_health(&config),
                 }),
             );
         }
 
-        if !process.running || !api_ready {
-            return;
+    }
+
+    fn poll_connection_health(
+        &mut self,
+        config: &LauncherConfig,
+        process: &CodexProcessInfo,
+        provider_mode: ProviderModeKind,
+        codex_api_ready: bool,
+    ) {
+        self.status.codex_api_ready = codex_api_ready;
+
+        let endpoint_health = if provider_mode == ProviderModeKind::LocalApi
+            || self.poll_count.is_multiple_of(2)
+        {
+            Some(connection_watch::probe_endpoint_health(config))
+        } else {
+            None
+        };
+
+        if let Some(ref health) = endpoint_health {
+            self.status.endpoint_health = Some(health.clone());
+            self.status.endpoint_reachable = health.reachable;
         }
 
+        if let Some(previous) = self.last_codex_running {
+            if previous && !process.running {
+                connection_watch::log_event(
+                    Some(self.root.as_path()),
+                    "WARN",
+                    "codex_process_stopped",
+                    json!({ "pid": process.pid, "method": process.method }),
+                );
+            } else if !previous && process.running {
+                connection_watch::log_event(
+                    Some(self.root.as_path()),
+                    "INFO",
+                    "codex_process_started",
+                    json!({
+                        "pid": process.pid,
+                        "method": process.method,
+                        "codexApiProbe": connection_watch::probe_codex_api_health(config),
+                    }),
+                );
+            }
+        }
+        self.last_codex_running = Some(process.running);
+
+        if process.running {
+            if let Some(previous) = self.last_codex_api_ready {
+                if previous && !codex_api_ready {
+                    let alert = connection_watch::alert_for_kind(
+                        ConnectionAlertKind::CodexApiDown,
+                        endpoint_health.clone(),
+                    );
+                    self.push_connection_alert(alert);
+                    connection_watch::log_event(
+                        Some(self.root.as_path()),
+                        "WARN",
+                        "codex_api_disconnected",
+                        json!({
+                            "codexApiProbe": connection_watch::probe_codex_api_health(config),
+                            "codexPid": process.pid,
+                        }),
+                    );
+                } else if !previous && codex_api_ready {
+                    let alert = connection_watch::alert_for_kind(
+                        ConnectionAlertKind::CodexApiRestored,
+                        endpoint_health.clone(),
+                    );
+                    self.push_connection_alert(alert);
+                    connection_watch::log_event(
+                        Some(self.root.as_path()),
+                        "INFO",
+                        "codex_api_reconnected",
+                        json!({
+                            "codexApiProbe": connection_watch::probe_codex_api_health(config),
+                            "codexPid": process.pid,
+                        }),
+                    );
+                }
+            }
+            self.last_codex_api_ready = Some(codex_api_ready);
+        } else {
+            self.last_codex_api_ready = None;
+        }
+
+        if provider_mode == ProviderModeKind::LocalApi {
+            if let Some(health) = endpoint_health {
+                if let Some(previous) = self.last_endpoint_reachable {
+                    if previous && !health.reachable {
+                        let alert = connection_watch::alert_for_kind(
+                            ConnectionAlertKind::EndpointDown,
+                            Some(health.clone()),
+                        );
+                        self.push_connection_alert(alert);
+                        connection_watch::log_event(
+                            Some(self.root.as_path()),
+                            "WARN",
+                            "endpoint_unreachable",
+                            json!({ "endpointHealth": health }),
+                        );
+                    } else if !previous && health.reachable {
+                        let alert = connection_watch::alert_for_kind(
+                            ConnectionAlertKind::EndpointRestored,
+                            Some(health.clone()),
+                        );
+                        self.push_connection_alert(alert);
+                        connection_watch::log_event(
+                            Some(self.root.as_path()),
+                            "INFO",
+                            "endpoint_reconnected",
+                            json!({ "endpointHealth": health }),
+                        );
+                    }
+                }
+                self.last_endpoint_reachable = Some(health.reachable);
+
+                if self.poll_count.is_multiple_of(6) {
+                    connection_watch::log_event(
+                        Some(self.root.as_path()),
+                        "INFO",
+                        "endpoint_heartbeat",
+                        json!({
+                            "providerMode": "localApi",
+                            "endpointHealth": health,
+                            "codexRunning": process.running,
+                            "codexApiReady": codex_api_ready,
+                        }),
+                    );
+                }
+            }
+        }
+    }
+
+    fn poll_session_watch(
+        &mut self,
+        config: &LauncherConfig,
+        process: &CodexProcessInfo,
+        settings: &crate::config::FailoverSettings,
+        check_rate_limits: bool,
+    ) {
         let runtime = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -151,7 +326,7 @@ impl CodexMonitor {
             }
         };
 
-        let client = match crate::acp_client::AcpClient::from_config(&config) {
+        let client = match crate::acp_client::AcpClient::from_config(config) {
             Ok(client) => client,
             Err(error) => {
                 self.status.last_error = Some(error.to_string());
@@ -186,6 +361,7 @@ impl CodexMonitor {
         };
 
         self.status.last_error = None;
+        let connection_patterns = connection_watch::default_connection_failure_patterns();
 
         if sessions.sessions.is_empty() && self.poll_count.is_multiple_of(12) {
             rate_limit_watch::log_event(
@@ -229,6 +405,31 @@ impl CodexMonitor {
             if changed {
                 self.last_session_fingerprints
                     .insert(session.session_id.clone(), fingerprint);
+
+                if let Some(matched) = connection_watch::matches_connection_failure(
+                    &response.content,
+                    &connection_patterns,
+                ) {
+                    let endpoint_health = connection_watch::probe_endpoint_health(config);
+                    let alert = connection_watch::alert_for_kind(
+                        ConnectionAlertKind::SessionConnectionError,
+                        Some(endpoint_health.clone()),
+                    );
+                    self.push_connection_alert(alert);
+                    connection_watch::log_event(
+                        Some(self.root.as_path()),
+                        "WARN",
+                        "session_connection_error",
+                        json!({
+                            "matchedPattern": matched,
+                            "sessionId": session.session_id,
+                            "contentPreview": truncate(&response.content, 4000),
+                            "endpointHealth": endpoint_health,
+                            "codexApiProbe": connection_watch::probe_codex_api_health(config),
+                        }),
+                    );
+                }
+
                 if rate_limit_watch::looks_interesting(&response.content) {
                     rate_limit_watch::log_event(
                         Some(self.root.as_path()),
@@ -247,9 +448,10 @@ impl CodexMonitor {
                 }
             }
 
-            if let Some(matched) =
-                failover::matches_rate_limit(&response.content, &settings.rate_limit_patterns)
-            {
+            if check_rate_limits {
+                if let Some(matched) =
+                    failover::matches_rate_limit(&response.content, &settings.rate_limit_patterns)
+                {
                 let snippet = truncate(&response.content, 500);
                 let alert = RateLimitAlert {
                     detected_at: Utc::now(),
@@ -261,7 +463,7 @@ impl CodexMonitor {
                 };
 
                 let checkpoint = failover::capture_checkpoint_from_running(
-                    &config,
+                    config,
                     &self.root,
                     "auto_rate_limit_candidate",
                 )
@@ -287,23 +489,20 @@ impl CodexMonitor {
                         "patternsChecked": settings.rate_limit_patterns,
                         "sessionCount": sessions.sessions.len(),
                         "sessions": sessions.sessions,
-                        "codexApiProbe": failover::probe_codex_api(&config),
+                        "codexApiProbe": connection_watch::probe_codex_api_health(config),
+                        "endpointHealth": connection_watch::probe_endpoint_health(config),
                         "codexProcess": {
                             "running": process.running,
                             "pid": process.pid,
                             "method": process.method,
                         },
                         "checkpoint": checkpoint,
-                        "nextSteps": [
-                            "Inspect rate-limit-discovery.jsonl beside app.log and ~/.codex-launchpad/discovery/rate-limit.jsonl",
-                            "Run `codex app-server generate-json-schema --out ./codex-schemas` while reproducing",
-                            "Compare REST /sessions output with Codex UI message"
-                        ],
                     }),
                 );
 
                 self.push_alert(alert);
                 return;
+                }
             }
         }
     }
@@ -322,13 +521,33 @@ impl CodexMonitor {
         self.status.recent_alerts.insert(0, alert);
         self.status.recent_alerts.truncate(20);
     }
+
+    fn push_connection_alert(&mut self, alert: ConnectionAlert) {
+        if self.status.active_connection_alert.as_ref().is_some_and(|existing| {
+            existing.kind == alert.kind && existing.message == alert.message
+        }) {
+            return;
+        }
+
+        self.status.active_connection_alert = Some(alert.clone());
+        self.status.recent_connection_alerts.insert(0, alert);
+        self.status.recent_connection_alerts.truncate(20);
+    }
 }
 
-fn discovery_hint() -> String {
+fn rate_limit_discovery_hint() -> String {
     let home = dirs::home_dir()
         .map(|path| path.join(".codex-launchpad/discovery/rate-limit.jsonl"))
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "~/.codex-launchpad/discovery/rate-limit.jsonl".to_string());
+    format!("Also mirrored in app.log. Persistent copy: {home}")
+}
+
+fn connection_discovery_hint() -> String {
+    let home = dirs::home_dir()
+        .map(|path| path.join(".codex-launchpad/discovery/connection.jsonl"))
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "~/.codex-launchpad/discovery/connection.jsonl".to_string());
     format!("Also mirrored in app.log. Persistent copy: {home}")
 }
 
@@ -354,8 +573,18 @@ pub fn spawn_monitor(
             "INFO",
             "watch_started",
             json!({
-                "message": "Automatic rate-limit discovery logging is active whenever Codex uses the account provider.",
-                "discoveryHint": discovery_hint(),
+                "message": "Automatic Codex interaction watch is active (rate limits, reconnects, endpoint health).",
+                "rateLimitDiscoveryHint": rate_limit_discovery_hint(),
+                "connectionDiscoveryHint": connection_discovery_hint(),
+            }),
+        );
+        connection_watch::log_event(
+            Some(root.as_path()),
+            "INFO",
+            "connection_watch_started",
+            json!({
+                "message": "Connection health monitoring is active for local API and Codex API transitions.",
+                "discoveryHint": connection_discovery_hint(),
             }),
         );
 
@@ -382,8 +611,7 @@ pub fn spawn_monitor(
             if guard.status.auto_switch {
                 if let Some(alert) = guard.status.active_alert.clone() {
                     if !alert.dismissed {
-                        let pid_file =
-                            crate::codex_process::CodexProcess::spawn_pid_file_path(&root);
+                        let pid_file = CodexProcess::spawn_pid_file_path(&root);
                         let config = match LauncherConfig::read(&config_path) {
                             Ok(config) => config,
                             Err(_) => continue,

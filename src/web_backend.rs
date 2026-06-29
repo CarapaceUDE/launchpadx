@@ -493,6 +493,7 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
         "getAppLogs" => rpc_get_app_logs(state),
         "getFailoverStatus" => rpc_get_failover_status(state),
         "dismissFailoverAlert" => rpc_dismiss_failover_alert(state),
+        "dismissConnectionAlert" => rpc_dismiss_connection_alert(state),
         "failoverToLocal" => rpc_failover_to_local(state, params),
         "captureSessionCheckpoint" => rpc_capture_session_checkpoint(state, params),
         "listSessionCheckpoints" => rpc_list_session_checkpoints(),
@@ -830,6 +831,12 @@ fn rpc_get_failover_status(state: &RpcState) -> serde_json::Value {
 fn rpc_dismiss_failover_alert(state: &RpcState) -> serde_json::Value {
     let mut monitor = state.monitor.lock().expect("monitor mutex");
     monitor.dismiss_alert();
+    serde_json::json!({"ok": true})
+}
+
+fn rpc_dismiss_connection_alert(state: &RpcState) -> serde_json::Value {
+    let mut monitor = state.monitor.lock().expect("monitor mutex");
+    monitor.dismiss_connection_alert();
     serde_json::json!({"ok": true})
 }
 

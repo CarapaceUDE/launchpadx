@@ -67,6 +67,35 @@ export interface SessionCheckpoint {
     resumePrompt: string;
 }
 
+export type ConnectionAlertKind =
+    | "endpointDown"
+    | "endpointRestored"
+    | "codexApiDown"
+    | "codexApiRestored"
+    | "sessionConnectionError";
+
+export type AlertSeverity = "error" | "warn" | "info";
+
+export interface EndpointHealth {
+    checkedAt: string;
+    endpointUrl?: string | null;
+    reachable: boolean;
+    statusCode?: number | null;
+    latencyMs?: number | null;
+    error?: string | null;
+    modelCount?: number | null;
+}
+
+export interface ConnectionAlert {
+    detectedAt: string;
+    kind: ConnectionAlertKind;
+    severity: AlertSeverity;
+    title: string;
+    message: string;
+    endpointHealth?: EndpointHealth | null;
+    dismissed: boolean;
+}
+
 export interface FailoverStatus {
     watching: boolean;
     autoSwitch: boolean;
@@ -76,6 +105,12 @@ export interface FailoverStatus {
     recentAlerts: FailoverAlert[];
     lastCheckpoint?: SessionCheckpoint | null;
     discoveryLogHint?: string;
+    activeConnectionAlert?: ConnectionAlert | null;
+    recentConnectionAlerts?: ConnectionAlert[];
+    endpointHealth?: EndpointHealth | null;
+    codexApiReady?: boolean;
+    endpointReachable?: boolean;
+    connectionLogHint?: string;
 }
 
 export interface HealthState {
