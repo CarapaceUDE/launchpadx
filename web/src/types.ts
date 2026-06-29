@@ -68,14 +68,14 @@ export interface SessionCheckpoint {
 }
 
 export interface FailoverStatus {
-    enabled: boolean;
+    watching: boolean;
     autoSwitch: boolean;
-    monitoring: boolean;
     lastPollAt?: string | null;
     lastError?: string | null;
     activeAlert?: FailoverAlert | null;
     recentAlerts: FailoverAlert[];
     lastCheckpoint?: SessionCheckpoint | null;
+    discoveryLogHint?: string;
 }
 
 export interface HealthState {

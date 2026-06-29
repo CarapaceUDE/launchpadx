@@ -11,5 +11,6 @@ pub mod failover;
 pub mod ipc;
 pub mod launcher;
 pub mod ollama;
+pub mod rate_limit_watch;
 pub mod session_checkpoint;
 pub mod web_backend;

@@ -98,9 +98,8 @@ const HEALTH_POLL_MS = 4000;
 const FAILOVER_POLL_MS = 10000;
 
 const EMPTY_FAILOVER_STATUS: FailoverStatus = {
-  enabled: false,
+  watching: true,
   autoSwitch: false,
-  monitoring: false,
   recentAlerts: [],
 };
 

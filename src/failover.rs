@@ -21,6 +21,21 @@ pub fn matches_rate_limit(text: &str, patterns: &[String]) -> Option<String> {
         .cloned()
 }
 
+pub fn local_overlay_from_config(config: &LauncherConfig) -> ProfileOverlay {
+    ProfileOverlay {
+        openai_base_url: config.openai_base_url.clone(),
+        ollama_ip: config.ollama_ip.clone(),
+        ollama_port: config.ollama_port,
+        ollama_scheme: config.ollama_scheme.clone(),
+        api_key: config.api_key.clone(),
+        codex_model: config.codex_model.clone(),
+        codex_provider_id: Some(config.codex_provider_id()),
+        codex_provider_name: Some(config.codex_provider_name()),
+        codex_api_key_mode: Some(config.codex_api_key_mode()),
+        working_directory: config.working_directory.clone(),
+    }
+}
+
 pub fn resolve_fallback_profile(
     config: &LauncherConfig,
     profile_name: Option<&str>,
@@ -28,17 +43,29 @@ pub fn resolve_fallback_profile(
     let settings = failover_settings(config);
     let profiles = profile_overlays(config);
 
-    let name = profile_name
-        .map(str::to_string)
-        .or_else(|| settings.fallback_chain.first().cloned())
-        .ok_or("No failover profile configured. Add profiles and failover.fallbackChain to config.json.")?;
+    if let Some(explicit) = profile_name {
+        if let Some(overlay) = profiles.get(explicit).cloned() {
+            return Ok((explicit.to_string(), overlay));
+        }
+        return Err(format!("Failover profile '{explicit}' was not found").into());
+    }
 
-    let overlay = profiles
-        .get(&name)
-        .cloned()
-        .ok_or_else(|| format!("Failover profile '{name}' was not found in config.profiles"))?;
+    if let Some(name) = settings.fallback_chain.first() {
+        if let Some(overlay) = profiles.get(name).cloned() {
+            return Ok((name.clone(), overlay));
+        }
+    }
 
-    Ok((name, overlay))
+    if config.ollama_ip.as_ref().is_some_and(|value| !value.trim().is_empty())
+        || config
+            .openai_base_url
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+    {
+        return Ok(("launcher-local".to_string(), local_overlay_from_config(config)));
+    }
+
+    Err("No local endpoint is configured in this launcher's settings yet.".into())
 }
 
 pub fn apply_profile_overlay(

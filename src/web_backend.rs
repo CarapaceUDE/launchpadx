@@ -461,13 +461,9 @@ fn start_server(
 }
 
 fn new_rpc_state(config_path: PathBuf, root: PathBuf) -> Arc<Mutex<RpcState>> {
-    let settings = LauncherConfig::read(&config_path)
-        .map(|config| config.failover.clone().unwrap_or_default())
-        .unwrap_or_default();
     let monitor = Arc::new(Mutex::new(CodexMonitor::new(
         config_path.clone(),
         root.clone(),
-        &settings,
     )));
     Arc::new(Mutex::new(RpcState {
         config_path,

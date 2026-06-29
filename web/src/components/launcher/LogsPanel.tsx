@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
 import { useLauncher, type LogEntry } from "../../context/LauncherContext";
 
-function levelColor(level: string) {
+function isRateLimitWatch(message: string) {
+  return message.includes("RATE_LIMIT_WATCH");
+}
+
+function levelColor(level: string, message: string) {
+  if (isRateLimitWatch(message)) return "text-amber-400";
   switch (level.toUpperCase()) {
     case "ERROR":
       return "text-red-500";
@@ -15,7 +20,8 @@ function levelColor(level: string) {
   }
 }
 
-function levelBg(level: string) {
+function levelBg(level: string, message: string) {
+  if (isRateLimitWatch(message)) return "bg-amber-500/15";
   switch (level.toUpperCase()) {
     case "ERROR":
       return "bg-red-500/10";
@@ -62,7 +68,13 @@ export function LogsPanel() {
   return (
     <div className="card-surface space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-[14px] font-semibold text-foreground">Application Logs</h3>
+        <div>
+          <h3 className="text-[14px] font-semibold text-foreground">Application Logs</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Rate-limit discovery writes highlighted <code className="text-[10px]">RATE_LIMIT_WATCH</code> entries here and to{" "}
+            <code className="text-[10px]">rate-limit-discovery.jsonl</code> automatically.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           <label className="flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-muted-foreground">
             <input
@@ -93,9 +105,9 @@ export function LogsPanel() {
           logs.map((entry, i) => (
             <div
               key={i}
-              className={`rounded px-2.5 py-1.5 leading-relaxed ${levelBg(entry.level)}`}
+              className={`rounded px-2.5 py-1.5 leading-relaxed ${levelBg(entry.level, entry.message)}`}
             >
-              <span className={`mr-2 font-semibold ${levelColor(entry.level)}`}>
+              <span className={`mr-2 font-semibold ${levelColor(entry.level, entry.message)}`}>
                 [{entry.level}]
               </span>
               <span className="text-foreground/80">{entry.message}</span>
