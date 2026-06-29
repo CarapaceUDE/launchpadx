@@ -498,7 +498,11 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
         "captureSessionCheckpoint" => rpc_capture_session_checkpoint(state, params),
         "listSessionCheckpoints" => rpc_list_session_checkpoints(),
         "listCodexSessions" => rpc_list_codex_sessions(state),
+        "listCodexSessionsDetailed" => rpc_list_codex_sessions_detailed(state, params),
+        "listCodexThreads" => rpc_list_codex_threads(state, params),
+        "getDiscoveryLogs" => rpc_get_discovery_logs(state, params),
         "probeCodexApi" => rpc_probe_codex_api(state, params),
+        "getCodexRateLimits" => rpc_get_codex_rate_limits(state, params),
         _ => serde_json::json!({"error": format!("Unknown method: {}", method)}),
     }
 }
@@ -905,6 +909,47 @@ fn rpc_list_session_checkpoints() -> serde_json::Value {
     }
 }
 
+fn rpc_list_codex_threads(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_request(state, &params) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error}),
+    };
+    let status = crate::codex_app_server::list_threads(&config);
+    serde_json::to_value(status)
+        .unwrap_or_else(|error| serde_json::json!({"error": error.to_string()}))
+}
+
+fn rpc_list_codex_sessions_detailed(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_request(state, &params) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error}),
+    };
+    let detail = crate::session_monitor::list_sessions_with_previews(&config);
+    serde_json::to_value(detail)
+        .unwrap_or_else(|error| serde_json::json!({"error": error.to_string()}))
+}
+
+fn rpc_get_discovery_logs(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.as_u64())
+        .unwrap_or(crate::discovery_log::DEFAULT_LIMIT as u64) as usize;
+    let stream = params
+        .get("stream")
+        .and_then(|value| value.as_str())
+        .unwrap_or("all");
+    let entries = crate::discovery_log::tail_discovery_logs(&state.root, limit);
+    let filtered: Vec<_> = entries
+        .into_iter()
+        .filter(|entry| match stream {
+            "rateLimit" => entry.stream == "rateLimit",
+            "connection" => entry.stream == "connection",
+            _ => true,
+        })
+        .collect();
+    serde_json::json!({ "entries": filtered })
+}
+
 fn rpc_list_codex_sessions(state: &RpcState) -> serde_json::Value {
     let config = match LauncherConfig::read(&state.config_path) {
         Ok(config) => config,
@@ -936,6 +981,16 @@ fn rpc_probe_codex_api(state: &RpcState, params: serde_json::Value) -> serde_jso
         Err(error) => return serde_json::json!({"error": error}),
     };
     failover::probe_codex_api(&config)
+}
+
+fn rpc_get_codex_rate_limits(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_request(state, &params) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error}),
+    };
+    let status = crate::codex_app_server::read_rate_limits(&config);
+    serde_json::to_value(status)
+        .unwrap_or_else(|error| serde_json::json!({"error": error.to_string()}))
 }
 
 fn rpc_toggle_auto_start(state: &RpcState) -> serde_json::Value {

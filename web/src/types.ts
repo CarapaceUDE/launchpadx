@@ -143,3 +143,85 @@ export interface CodexProcessInfo {
     method: string | null;
     restartRequired: boolean;
 }
+
+export interface RateLimitWindow {
+    usedPercent?: number | null;
+    windowDurationMins?: number | null;
+    resetsAt?: number | null;
+}
+
+export interface RateLimitCredits {
+    hasCredits?: boolean | null;
+    unlimited?: boolean | null;
+    balance?: string | null;
+}
+
+export interface CodexRateLimits {
+    limitId?: string | null;
+    limitName?: string | null;
+    primary?: RateLimitWindow | null;
+    secondary?: RateLimitWindow | null;
+    credits?: RateLimitCredits | null;
+    planType?: string | null;
+    rateLimitReachedType?: string | null;
+}
+
+export interface RateLimitResetCredits {
+    availableCount?: number | null;
+}
+
+export interface CodexThreadSummary {
+    id: string;
+    name?: string | null;
+    status?: string | null;
+    path?: string | null;
+    createdAt?: string | null;
+    model?: string | null;
+}
+
+export interface CodexThreadListStatus {
+    ok: boolean;
+    fetchedAt: string;
+    source: string;
+    codexCli?: string | null;
+    error?: string | null;
+    threads: CodexThreadSummary[];
+}
+
+export interface SessionPreviewContent {
+    role: string;
+    done: boolean;
+    content: string;
+}
+
+export interface CodexSessionDetail {
+    sessionId: string;
+    createdAt?: string | null;
+    preview?: SessionPreviewContent | null;
+    previewError?: string | null;
+}
+
+export interface CodexSessionListDetail {
+    sessions: CodexSessionDetail[];
+    error?: string | null;
+}
+
+export interface DiscoveryLogEntry {
+    stream: string;
+    source: string;
+    at: string;
+    event: string;
+    details: Record<string, unknown>;
+}
+
+export interface CodexRateLimitsStatus {
+    ok: boolean;
+    fetchedAt: string;
+    source: string;
+    codexCli?: string | null;
+    error?: string | null;
+    requiresAuth?: boolean | null;
+    planType?: string | null;
+    rateLimits?: CodexRateLimits | null;
+    rateLimitResetCredits?: RateLimitResetCredits | null;
+}

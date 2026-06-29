@@ -123,6 +123,112 @@ pub fn codex_process_visible() -> bool {
         || stdout.contains("\\windowsapps\\openai.codex_")
 }
 
+pub fn cli_install_paths() -> Vec<PathBuf> {
+    let mut paths = discover_spawnable_codex_bins();
+    paths.extend(candidate_paths());
+    paths.extend(discover_via_where("codex"));
+    paths.extend(discover_via_where("codex-app"));
+    paths.retain(|path| !is_blocked_windowsapps_cli(path));
+    paths
+}
+
+/// Store installs block direct execution of `WindowsApps\\...\\codex.exe`, but Codex
+/// mirrors a spawnable CLI under `%LOCALAPPDATA%\\OpenAI\\Codex\\bin\\...`.
+pub fn discover_spawnable_codex_bins() -> Vec<PathBuf> {
+    let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) else {
+        return Vec::new();
+    };
+
+    let mut paths = Vec::new();
+    paths.extend(collect_codex_bins_under(
+        &local.join("OpenAI").join("Codex").join("bin"),
+    ));
+
+    let packages = local.join("Packages");
+    if let Ok(entries) = std::fs::read_dir(&packages) {
+        for entry in entries.flatten() {
+            let name = entry
+                .file_name()
+                .to_string_lossy()
+                .to_ascii_lowercase();
+            if !name.starts_with("openai.codex_") {
+                continue;
+            }
+            let cache_bin = entry
+                .path()
+                .join("LocalCache")
+                .join("Local")
+                .join("OpenAI")
+                .join("Codex")
+                .join("bin");
+            paths.extend(collect_codex_bins_under(&cache_bin));
+            let flat = cache_bin.join("codex.exe");
+            if flat.is_file() {
+                paths.push(flat);
+            }
+        }
+    }
+
+    paths.sort_by_key(|path| std::cmp::Reverse(modified_key(path)));
+    paths
+}
+
+fn collect_codex_bins_under(root: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(_) => return paths,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let cli = path.join("codex.exe");
+            if cli.is_file() {
+                paths.push(cli);
+            }
+        } else if path
+            .file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case("codex.exe"))
+        {
+            paths.push(path);
+        }
+    }
+
+    paths
+}
+
+fn modified_key(path: &Path) -> u64 {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|meta| meta.modified().ok())
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+pub fn is_blocked_windowsapps_cli(path: &Path) -> bool {
+    path.to_string_lossy()
+        .replace('/', "\\")
+        .to_ascii_lowercase()
+        .contains("\\windowsapps\\openai.codex_")
+}
+
+fn discover_via_where(command: &str) -> Vec<PathBuf> {
+    let output = match Command::new("where.exe").arg(command).output() {
+        Ok(output) if output.status.success() => output,
+        _ => return Vec::new(),
+    };
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(PathBuf::from)
+        .filter(|path| path.is_file())
+        .collect()
+}
+
 fn candidate_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
     let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
@@ -212,5 +318,13 @@ mod tests {
     fn packaged_codex_resource_ignores_standalone_install() {
         let path = Path::new(r"C:\Users\alice\AppData\Local\Programs\Codex\Codex.exe");
         assert!(!is_packaged_codex_resource(path));
+    }
+
+    #[test]
+    fn blocks_windowsapps_shim_paths() {
+        let path = Path::new(
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.623.8305.0_x64__2p2nqsd0c76g0\app\resources\codex.exe",
+        );
+        assert!(is_blocked_windowsapps_cli(path));
     }
 }

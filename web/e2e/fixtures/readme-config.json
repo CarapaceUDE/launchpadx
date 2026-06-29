@@ -1,5 +1,5 @@
 {
-  "autoStart": false,
+  "autoStart": true,
   "openaiBaseUrl": "http://127.0.0.1:11499/v1",
   "ollamaIp": "127.0.0.1",
   "ollamaPort": 11499,
@@ -16,5 +16,7 @@
   "codexApiScheme": null,
   "discoverOllamaModels": false,
   "codexArgs": [],
-  "workingDirectory": "."
+  "workingDirectory": ".",
+  "failover": null,
+  "profiles": null
 }

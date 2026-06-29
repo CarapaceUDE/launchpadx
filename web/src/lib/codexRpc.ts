@@ -1,6 +1,10 @@
 import type { CodexConfigInspection } from "./codexProfile";
 import type {
   CodexProcessInfo,
+  CodexRateLimitsStatus,
+  CodexSessionListDetail,
+  CodexThreadListStatus,
+  DiscoveryLogEntry,
   FailoverStatus,
   LauncherConfig,
   SessionCheckpoint,
@@ -87,6 +91,13 @@ export interface CodexRpcClient {
   listCodexSessions(): Promise<
     LauncherResponse<{ sessions: { sessionId: string; createdAt?: string | null }[] }>
   >;
+  listCodexSessionsDetailed(
+    cfg?: LauncherConfig,
+  ): Promise<LauncherResponse<CodexSessionListDetail>>;
+  listCodexThreads(cfg?: LauncherConfig): Promise<LauncherResponse<CodexThreadListStatus>>;
+  getDiscoveryLogs(
+    options?: { limit?: number; stream?: "all" | "rateLimit" | "connection" },
+  ): Promise<LauncherResponse<{ entries: DiscoveryLogEntry[] }>>;
   probeCodexApi(
     cfg?: LauncherConfig,
   ): Promise<
@@ -98,6 +109,7 @@ export interface CodexRpcClient {
       notes: string[];
     }>
   >;
+  getCodexRateLimits(cfg?: LauncherConfig): Promise<LauncherResponse<CodexRateLimitsStatus>>;
 }
 
 export function createCodexRpcClient(): CodexRpcClient {
@@ -149,7 +161,15 @@ export function createCodexRpcClient(): CodexRpcClient {
       call("captureSessionCheckpoint", trigger ? { trigger } : {}),
     listSessionCheckpoints: () => call("listSessionCheckpoints"),
     listCodexSessions: () => call("listCodexSessions"),
+    listCodexSessionsDetailed: (cfg) =>
+      call("listCodexSessionsDetailed", (cfg ?? {}) as unknown as Record<string, unknown>),
+    listCodexThreads: (cfg) =>
+      call("listCodexThreads", (cfg ?? {}) as unknown as Record<string, unknown>),
+    getDiscoveryLogs: (options) =>
+      call("getDiscoveryLogs", (options ?? {}) as Record<string, unknown>),
     probeCodexApi: (cfg) => call("probeCodexApi", (cfg ?? {}) as unknown as Record<string, unknown>),
+    getCodexRateLimits: (cfg) =>
+      call("getCodexRateLimits", (cfg ?? {}) as unknown as Record<string, unknown>),
   };
 }
 

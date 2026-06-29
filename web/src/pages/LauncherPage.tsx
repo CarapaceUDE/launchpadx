@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { LauncherConfig, ModelInfo } from "../types";
+import type { LauncherConfig } from "../types";
 import {
   useLauncher,
   configToCodexForm,
@@ -9,10 +9,9 @@ import {
 import { Sidebar } from "../components/launcher/Sidebar";
 import { ProviderModeCard } from "../components/launcher/ProviderModeCard";
 import { ProviderSettingsPanel } from "../components/launcher/ProviderSettingsPanel";
-import { ModelsPanel } from "../components/launcher/ModelsPanel";
+import { SessionMonitoringPanel } from "../components/launcher/SessionMonitoringPanel";
 import { LogsPanel } from "../components/launcher/LogsPanel";
 import { AboutPanel } from "../components/launcher/AboutPanel";
-import { ModelDetailsModal } from "../components/launcher/ModelDetailsModal";
 import { buildOpenAiBaseUrl } from "../lib/endpoint";
 import { reconcileModelSelection } from "../lib/modelSelection";
 import { activeProviderMode, type ProviderMode } from "../lib/codexProfile";
@@ -45,11 +44,15 @@ export function LauncherPage() {
     dismissFailoverAlert,
     dismissConnectionAlert,
     copyResumePrompt,
+    rateLimitsStatus,
+    rateLimitsLoading,
+    refreshRateLimits,
+    refreshFailoverStatus,
+    captureCheckpoint,
   } = useLauncher();
 
   const [activeNav, setActiveNav] = useState<NavKey>("launcher");
   const [settingsProvider, setSettingsProvider] = useState<ProviderMode>("local");
-  const [detailsModel, setDetailsModel] = useState<ModelInfo | null>(null);
   const [codexForm, setCodexForm] = useState<CodexConfigForm>(configToCodexForm({}));
 
   useEffect(() => {
@@ -62,6 +65,7 @@ export function LauncherPage() {
   const port = String(config.ollamaPort ?? 11434);
   const scheme = (config.ollamaScheme as "http" | "https") ?? "http";
   const autoStart = Boolean(config.autoStart);
+  const autoSwitchOnRateLimit = Boolean(config.failover?.autoSwitch);
   const workingDir = config.workingDirectory ?? "";
   const apiKey = config.apiKey ?? "";
   const modelNames = models.map((m) => m.name);
@@ -207,12 +211,20 @@ export function LauncherPage() {
                 startBlockedReason={startBlockedReason}
                 statusStripText={statusMessage}
                 statusVariant={statusVariant}
+                rateLimitsStatus={rateLimitsStatus}
+                rateLimitsLoading={rateLimitsLoading}
               />
             </div>
           ) : (
             <div className="mt-2">
-              {activeNav === "models" && (
-                <ModelsPanel modelCount={models.length} onRefresh={refreshModels} />
+              {activeNav === "sessions" && (
+                <SessionMonitoringPanel
+                  failoverStatus={failoverStatus}
+                  serverState={serverState}
+                  onRefreshWatch={refreshFailoverStatus}
+                  onCaptureCheckpoint={captureCheckpoint}
+                  onCopyResume={copyResumePrompt}
+                />
               )}
               {activeNav === "settings" && (
                 <ProviderSettingsPanel
@@ -234,6 +246,13 @@ export function LauncherPage() {
                   onRefreshModels={refreshModels}
                   refreshing={refreshing}
                   modelCount={models.length}
+                  rateLimitsStatus={rateLimitsStatus}
+                  rateLimitsLoading={rateLimitsLoading}
+                  onRefreshRateLimits={() => void refreshRateLimits()}
+                  autoSwitchOnRateLimit={autoSwitchOnRateLimit}
+                  onAutoSwitchOnRateLimitChange={(v) =>
+                    updateConfig("failover", { ...config.failover, autoSwitch: v })
+                  }
                 />
               )}
               {activeNav === "logs" && <LogsPanel />}
@@ -243,9 +262,6 @@ export function LauncherPage() {
         </div>
       </main>
 
-      {detailsModel && (
-        <ModelDetailsModal model={detailsModel} onClose={() => setDetailsModel(null)} />
-      )}
     </div>
   );
 }

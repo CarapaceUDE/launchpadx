@@ -63,6 +63,20 @@ test.describe("Codex Launchpad", () => {
     await expect(page.getByTestId("endpoint-base-url")).toHaveValue("http://10.0.0.5:8080/v1");
   });
 
+  test("sidebar navigation reaches Sessions monitor", async ({ page }) => {
+    await page.getByTestId("nav-sessions").click();
+    await expect(page.getByTestId("session-monitoring-panel")).toBeVisible();
+    await expect(page.getByText("Watch status")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Codex threads/ })).toBeVisible();
+    await expect(page.getByTestId("discovery-log-viewer")).toBeVisible();
+  });
+
+  test("local settings includes models catalog", async ({ page }) => {
+    await page.getByTestId("nav-settings").click();
+    await expect(page.getByTestId("local-models-catalog")).toBeVisible();
+    await expect(page.getByText(/Select the active model on the Launchpad/i)).toBeVisible();
+  });
+
   test("sidebar navigation reaches About", async ({ page }) => {
     await page.getByTestId("nav-about").click();
     await expect(page.getByRole("heading", { name: "Codex Launchpad" })).toBeVisible();

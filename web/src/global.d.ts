@@ -5,6 +5,10 @@ import type {
     FailoverStatus,
     LauncherConfig,
     CodexProcessInfo,
+    CodexRateLimitsStatus,
+    CodexSessionListDetail,
+    CodexThreadListStatus,
+    DiscoveryLogEntry,
     SessionCheckpoint,
 } from './types';
 
@@ -47,7 +51,11 @@ interface CodexIPC {
     captureSessionCheckpoint(trigger?: string): Promise<LauncherResponse<{ ok?: boolean; checkpoint?: SessionCheckpoint | null }>>;
     listSessionCheckpoints(): Promise<LauncherResponse<{ checkpoints: SessionCheckpoint[] }>>;
     listCodexSessions(): Promise<LauncherResponse<{ sessions: { sessionId: string; createdAt?: string | null }[] }>>;
+    listCodexSessionsDetailed(cfg?: LauncherConfig): Promise<LauncherResponse<CodexSessionListDetail>>;
+    listCodexThreads(cfg?: LauncherConfig): Promise<LauncherResponse<CodexThreadListStatus>>;
+    getDiscoveryLogs(options?: { limit?: number; stream?: 'all' | 'rateLimit' | 'connection' }): Promise<LauncherResponse<{ entries: DiscoveryLogEntry[] }>>;
     probeCodexApi(cfg?: LauncherConfig): Promise<LauncherResponse<{ codexApiBaseUrl: string; healthOk: boolean; restSessionsSupported: boolean; appServerWebSocketUrl: string; notes: string[] }>>;
+    getCodexRateLimits(cfg?: LauncherConfig): Promise<LauncherResponse<CodexRateLimitsStatus>>;
 }
 
 declare global {

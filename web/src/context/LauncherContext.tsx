@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { FailoverStatus, LauncherConfig, ModelInfo } from "../types";
+import type { CodexRateLimitsStatus, FailoverStatus, LauncherConfig, ModelInfo } from "../types";
 import { normalizeConfig } from "../lib/endpoint";
 import {
   activeProviderMode,
@@ -36,7 +36,7 @@ import {
 import type { ServerPillState } from "../components/launcher/primitives";
 import { APP_NAME } from "../lib/branding";
 
-export type NavKey = "launcher" | "models" | "settings" | "logs" | "about";
+export type NavKey = "launcher" | "sessions" | "settings" | "logs" | "about";
 
 export interface LogEntry {
   level: string;
@@ -71,6 +71,8 @@ interface LauncherState {
   writingCodex: boolean;
   revertingCodex: boolean;
   failoverStatus: FailoverStatus;
+  rateLimitsStatus: CodexRateLimitsStatus | null;
+  rateLimitsLoading: boolean;
 }
 
 interface LauncherContextValue extends LauncherState {
@@ -89,6 +91,8 @@ interface LauncherContextValue extends LauncherState {
   dismissFailoverAlert: () => Promise<void>;
   dismissConnectionAlert: () => Promise<void>;
   copyResumePrompt: () => Promise<void>;
+  refreshRateLimits: () => Promise<void>;
+  captureCheckpoint: () => Promise<void>;
 }
 
 const LauncherContext = createContext<LauncherContextValue | null>(null);
@@ -97,6 +101,7 @@ const SAVE_DEBOUNCE_MS = 800;
 const CODEX_SYNC_DEBOUNCE_MS = 1200;
 const HEALTH_POLL_MS = 4000;
 const FAILOVER_POLL_MS = 10000;
+const RATE_LIMIT_POLL_MS = 60_000;
 
 const EMPTY_FAILOVER_STATUS: FailoverStatus = {
   watching: true,
@@ -157,6 +162,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     writingCodex: false,
     revertingCodex: false,
     failoverStatus: EMPTY_FAILOVER_STATUS,
+    rateLimitsStatus: null,
+    rateLimitsLoading: false,
   });
 
   const configRef = useRef<LauncherConfig>({});
@@ -166,6 +173,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const healthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const failoverPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rateLimitPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rateLimitsFetchRef = useRef(false);
   const saveGenerationRef = useRef(0);
   const modelsRef = useRef<ModelInfo[]>([]);
   const codexProfileRef = useRef<CodexProfileState>(state.codexProfile);
@@ -501,6 +510,38 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshFailoverStatus]);
 
+  const refreshRateLimits = useCallback(async () => {
+    if (rateLimitsFetchRef.current) return;
+    rateLimitsFetchRef.current = true;
+    setState((prev) => ({ ...prev, rateLimitsLoading: true }));
+    try {
+      const result = await window.codexRPC.getCodexRateLimits(configRef.current);
+      const status = unwrap<CodexRateLimitsStatus>(result);
+      setState((prev) => ({
+        ...prev,
+        rateLimitsStatus: status,
+        rateLimitsLoading: false,
+      }));
+    } catch {
+      setState((prev) => ({ ...prev, rateLimitsLoading: false }));
+    } finally {
+      rateLimitsFetchRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshRateLimits();
+    rateLimitPollRef.current = setInterval(() => {
+      void refreshRateLimits();
+    }, RATE_LIMIT_POLL_MS);
+    return () => {
+      if (rateLimitPollRef.current) {
+        clearInterval(rateLimitPollRef.current);
+        rateLimitPollRef.current = null;
+      }
+    };
+  }, [refreshRateLimits]);
+
   const failoverToLocal = useCallback(
     async (profileName?: string) => {
       setOperation(
@@ -601,6 +642,27 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       }));
     }
   }, [state.failoverStatus.lastCheckpoint?.resumePrompt]);
+
+  const captureCheckpoint = useCallback(async () => {
+    try {
+      const result = await window.codexRPC.captureSessionCheckpoint("manual_ui");
+      unwrap(result);
+      await refreshFailoverStatus();
+      setState((prev) => ({
+        ...prev,
+        statusMessage: "Session checkpoint captured.",
+        statusVariant: "success",
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState((prev) => ({
+        ...prev,
+        statusMessage: `Could not capture checkpoint: ${msg}`,
+        statusVariant: "error",
+      }));
+      throw e;
+    }
+  }, [refreshFailoverStatus]);
 
   const refreshModels = useCallback(async (): Promise<void> => {
     setOperation("refreshing_models", "Refreshing models from endpoint...");
@@ -1070,6 +1132,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     dismissFailoverAlert,
     dismissConnectionAlert,
     copyResumePrompt,
+    refreshRateLimits,
+    captureCheckpoint,
   };
 
   return <LauncherContext.Provider value={value}>{children}</LauncherContext.Provider>;

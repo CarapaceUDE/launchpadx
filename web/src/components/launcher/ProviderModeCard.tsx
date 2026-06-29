@@ -17,6 +17,8 @@ import {
   blocksProviderSwitch,
   codexAccountSwitchWarnings,
 } from "../../lib/providerGuards";
+import type { CodexRateLimitsStatus } from "../../types";
+import { CodexRateLimitsCompact } from "./CodexRateLimitsPanel";
 
 function ProviderSegment({
   mode,
@@ -108,7 +110,7 @@ function ProviderSegment({
         <Settings className="h-3.5 w-3.5" />
       </button>
 
-      {children ? <div className="mt-0.5 flex items-center gap-1.5">{children}</div> : null}
+      {children ? <div className="mt-0.5 w-full min-w-0">{children}</div> : null}
     </div>
   );
 }
@@ -137,6 +139,8 @@ export function ProviderModeCard({
   startBlockedReason,
   statusStripText,
   statusVariant,
+  rateLimitsStatus,
+  rateLimitsLoading,
 }: {
   profile: CodexProfileState;
   activeMode: ProviderMode;
@@ -161,6 +165,8 @@ export function ProviderModeCard({
   startBlockedReason?: string;
   statusStripText: string;
   statusVariant?: "default" | "success" | "error";
+  rateLimitsStatus: CodexRateLimitsStatus | null;
+  rateLimitsLoading?: boolean;
 }) {
   const [confirmCodex, setConfirmCodex] = useState(false);
   const resolvedMode = activeProviderMode(profile);
@@ -267,7 +273,9 @@ export function ProviderModeCard({
             disabled={switching || switchBlocked}
             onSelect={() => handleSelect("codex")}
             onOpenSettings={() => onOpenProviderSettings("codex")}
-          />
+          >
+            <CodexRateLimitsCompact status={rateLimitsStatus} loading={rateLimitsLoading} />
+          </ProviderSegment>
 
           <ProviderSegment
             mode="local"

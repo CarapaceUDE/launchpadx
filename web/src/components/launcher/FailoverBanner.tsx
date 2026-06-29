@@ -30,8 +30,9 @@ export function FailoverBanner({
               Codex account limit detected
             </p>
             <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-              Matched "{alert.matchedPattern}". Switch to your configured local profile,
-              restart Codex, and resume with the saved context.
+              {alert.source === "app_server_rate_limits"
+                ? `Codex app-server reports ${alert.matchedPattern} via account/rateLimits/read. Switch to your local provider, restart Codex, and resume with the saved context.`
+                : `Matched "${alert.matchedPattern}". Switch to your configured local profile, restart Codex, and resume with the saved context.`}
             </p>
             {alert.snippet ? (
               <p className="mt-2 truncate rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5 text-[12px] text-foreground/80">

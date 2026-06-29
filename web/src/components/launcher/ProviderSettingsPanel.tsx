@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Cloud, Eye, EyeOff, RefreshCw, Server, Settings } from "lucide-react";
+import { ChevronDown, Cloud, Eye, EyeOff, Server, Settings } from "lucide-react";
 import { Card, FormField, TextInput, ToggleRow } from "./primitives";
 import { ThemeToggle } from "./ThemeToggle";
 import type { CodexConfigForm } from "../../context/LauncherContext";
@@ -8,6 +8,9 @@ import {
   providerModeLabel,
   type ProviderMode,
 } from "../../lib/codexProfile";
+import type { CodexRateLimitsStatus } from "../../types";
+import { CodexRateLimitsPanel } from "./CodexRateLimitsPanel";
+import { LocalModelsCatalog } from "./LocalModelsCatalog";
 
 const PROVIDERS: ProviderMode[] = ["codex", "local"];
 
@@ -30,6 +33,11 @@ export function ProviderSettingsPanel({
   onRefreshModels,
   refreshing,
   modelCount,
+  rateLimitsStatus,
+  rateLimitsLoading,
+  onRefreshRateLimits,
+  autoSwitchOnRateLimit,
+  onAutoSwitchOnRateLimitChange,
 }: {
   provider: ProviderMode;
   onProviderChange: (mode: ProviderMode) => void;
@@ -49,6 +57,11 @@ export function ProviderSettingsPanel({
   onRefreshModels: () => void;
   refreshing: boolean;
   modelCount: number;
+  rateLimitsStatus: CodexRateLimitsStatus | null;
+  rateLimitsLoading?: boolean;
+  onRefreshRateLimits: () => void;
+  autoSwitchOnRateLimit: boolean;
+  onAutoSwitchOnRateLimitChange: (v: boolean) => void;
 }) {
   const [showKey, setShowKey] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -101,6 +114,13 @@ export function ProviderSettingsPanel({
               onChange={onAutoStartChange}
               testId="auto-start-toggle"
             />
+            <ToggleRow
+              label="Auto-switch to local on rate limit"
+              description="When Codex app-server reports rateLimitReachedType, stop Codex, apply your local API settings, and restart automatically"
+              checked={autoSwitchOnRateLimit}
+              onChange={onAutoSwitchOnRateLimitChange}
+              testId="auto-switch-rate-limit-toggle"
+            />
             <FormField
               label="Working Directory"
               hint="Absolute path to the project directory Codex should use"
@@ -112,6 +132,14 @@ export function ProviderSettingsPanel({
                 placeholder="C:\projects\my-app"
               />
             </FormField>
+
+            <div className="border-t border-border pt-4">
+              <CodexRateLimitsPanel
+                status={rateLimitsStatus}
+                loading={rateLimitsLoading}
+                onRefresh={onRefreshRateLimits}
+              />
+            </div>
           </div>
         </Card>
       ) : (
@@ -180,17 +208,7 @@ export function ProviderSettingsPanel({
               </div>
             </FormField>
 
-            <button
-              type="button"
-              data-testid="refresh-models"
-              onClick={onRefreshModels}
-              disabled={refreshing}
-              aria-busy={refreshing}
-              className="inline-flex h-[38px] items-center gap-2 rounded-md border border-input bg-background px-4 text-[13px] font-medium text-foreground hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              {refreshing ? "Refreshing..." : `Refresh models (${modelCount})`}
-            </button>
+            <LocalModelsCatalog modelCount={modelCount} onRefresh={onRefreshModels} />
           </div>
         </Card>
       )}
@@ -228,10 +246,14 @@ export function ProviderSettingsPanel({
                   onChange={(e) => onCodexConfigChange({ codexConfigPath: e.target.value })}
                 />
               </FormField>
-              <FormField label="Codex Command">
+              <FormField
+                label="Codex command override"
+                hint="Leave blank for auto-discovery from running Codex and common install paths"
+              >
                 <TextInput
                   value={codexConfig.codexCommand}
                   onChange={(e) => onCodexConfigChange({ codexCommand: e.target.value })}
+                  placeholder="Auto-detect"
                 />
               </FormField>
             </div>

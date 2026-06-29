@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -50,6 +51,51 @@ pub enum LauncherError {
     },
     #[error("{0}")]
     Platform(String),
+}
+
+/// Executable paths suitable for spawning `codex app-server` and other CLI subcommands.
+pub fn cli_executable_candidates(config: &LauncherConfig) -> Vec<String> {
+    let mut candidates = Vec::new();
+    let mut seen = HashSet::new();
+
+    let mut push_path = |path: PathBuf| {
+        if !path.is_file() {
+            return;
+        }
+        #[cfg(target_os = "windows")]
+        if windows::is_blocked_windowsapps_cli(&path) {
+            return;
+        }
+        let value = path.to_string_lossy().into_owned();
+        if seen.insert(value.clone()) {
+            candidates.push(value);
+        }
+    };
+
+    if let Some(command) = config.codex_command() {
+        let path = PathBuf::from(&command);
+        if path.is_file() {
+            push_path(path);
+        } else if let Some(found) = find_on_path(&command) {
+            push_path(found);
+        }
+    }
+
+    for path in platform_cli_install_paths() {
+        push_path(path);
+    }
+
+    for name in cli_path_command_names() {
+        if let Some(path) = find_on_path(name) {
+            push_path(path);
+        }
+    }
+
+    if candidates.is_empty() {
+        candidates.push("codex".to_string());
+    }
+
+    candidates
 }
 
 pub fn resolve(config: &LauncherConfig) -> Result<LaunchTarget, LauncherError> {
@@ -211,4 +257,48 @@ fn first_existing(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn common_path_commands() -> &'static [&'static str] {
     &["codex-app", "codex"]
+}
+
+fn cli_path_command_names() -> &'static [&'static str] {
+    #[cfg(target_os = "windows")]
+    {
+        &["codex-app", "codex", "Codex"]
+    }
+    #[cfg(target_os = "macos")]
+    {
+        &["codex-app", "codex"]
+    }
+    #[cfg(target_os = "linux")]
+    {
+        &["codex"]
+    }
+}
+
+fn platform_cli_install_paths() -> Vec<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        return windows::cli_install_paths();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return macos::cli_install_paths();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return linux::cli_install_paths();
+    }
+    #[allow(unreachable_code)]
+    Vec::new()
+}
+
+#[cfg(test)]
+mod cli_candidate_tests {
+    use super::*;
+
+    #[test]
+    fn cli_candidates_never_empty() {
+        let config = LauncherConfig::default();
+        let candidates = cli_executable_candidates(&config);
+        assert!(!candidates.is_empty());
+    }
 }

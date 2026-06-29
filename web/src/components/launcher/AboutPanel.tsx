@@ -67,22 +67,39 @@ export function AboutPanel() {
 
       <div className="mt-4 border-t border-border pt-4 text-left">
         <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Features
+          Early Access Builds
         </h4>
-        <ul className="space-y-1.5 text-[12px] text-foreground/70">
-          {[
-            "Start/stop Codex-compatible local API server",
-            "Auto-discovery of available models",
-            "Endpoint configuration with auto-generated Base URL",
-            "Dark/light theme support",
-            "Application log viewer",
-          ].map((feature) => (
-            <li key={feature} className="flex items-start gap-2">
-              <span className="mt-0.5 text-success">•</span>
-              {feature}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-2 text-[12px] leading-relaxed text-foreground/70">
+          <p>
+            Official pre-compiled binaries are currently available to{" "}
+            <a
+              href={ORG_PATREON}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
+              Patreon supporters
+            </a>{" "}
+            as early access. We are working toward making binaries available
+            directly from us for everyone.
+          </p>
+          <p>
+            Patreon is primarily a way to support the project — you do not need
+            it to use {APP_NAME}. The source is always free and open.
+          </p>
+          <p>
+            Prefer to build from source? Join our{" "}
+            <a
+              href={ORG_DISCORD}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
+              community Discord
+            </a>{" "}
+            and we will help you get set up.
+          </p>
+        </div>
       </div>
 
       <div className="mt-4 border-t border-border pt-3 text-[10px] text-muted-foreground">

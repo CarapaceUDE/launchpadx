@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const isReadmeScreenshot = process.argv.some((arg) => arg.includes("readme-screenshot"));
+const isReadmeScreenshot = process.argv.some((arg) => arg.includes("readme-screenshot.spec"));
 const configFixture = isReadmeScreenshot
   ? path.join(__dirname, "e2e", "fixtures", "readme-config.json")
   : path.join(__dirname, "e2e", "fixtures", "config.json");

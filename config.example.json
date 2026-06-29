@@ -16,5 +16,8 @@
     "codexApiPort": 4000,
     "codexApiScheme": "http",
     "codexArgs": [],
-    "workingDirectory": ""
+    "workingDirectory": "",
+    "failover": {
+        "autoSwitch": false
+    }
 }

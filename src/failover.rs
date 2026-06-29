@@ -2,8 +2,11 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 
+use crate::codex_app_server::{self, CodexRateLimitsStatus};
 use crate::config::{FailoverSettings, LauncherConfig, ProfileOverlay};
 use crate::session_checkpoint::{self, SessionCheckpoint};
+
+pub const APP_SERVER_RATE_LIMIT_SOURCE: &str = "app_server_rate_limits";
 
 pub fn failover_settings(config: &LauncherConfig) -> FailoverSettings {
     config.failover.clone().unwrap_or_default()
@@ -19,6 +22,14 @@ pub fn matches_rate_limit(text: &str, patterns: &[String]) -> Option<String> {
         .iter()
         .find(|pattern| lower.contains(&pattern.to_lowercase()))
         .cloned()
+}
+
+pub fn rate_limit_reached_from_status(status: &CodexRateLimitsStatus) -> Option<String> {
+    codex_app_server::rate_limit_reached_type(status)
+}
+
+pub fn should_failover_for_rate_limits(status: &CodexRateLimitsStatus) -> bool {
+    status.ok && codex_app_server::is_rate_limit_reached(status)
 }
 
 pub fn local_overlay_from_config(config: &LauncherConfig) -> ProfileOverlay {
@@ -201,9 +212,9 @@ pub fn probe_codex_api(config: &LauncherConfig) -> serde_json::Value {
         "restSessionsSupported": health_ok,
         "appServerWebSocketUrl": format!("ws://127.0.0.1:{}/", config.codex_api_port()),
         "notes": [
-            "REST /sessions is wired for checkpoint capture and rate-limit text scanning.",
-            "Codex app-server JSON-RPC notifications are the preferred long-term detection path.",
-            "Run `codex app-server generate-json-schema --out ./codex-schemas` when a rate limit occurs to map events."
+            "REST /sessions is wired for checkpoint capture and legacy text discovery logging.",
+            "Auto-failover uses account/rateLimits/read rateLimitReachedType from codex app-server.",
+            "Session text matches are logged for discovery but do not trigger auto-switch."
         ]
     })
 }
@@ -221,5 +232,52 @@ mod tests {
             Some("out of messages".to_string())
         );
         assert!(matches_rate_limit("everything is fine", &patterns).is_none());
+    }
+
+    #[test]
+    fn structured_rate_limit_requires_reached_type() {
+        let limited = CodexRateLimitsStatus {
+            ok: true,
+            fetched_at: "now".to_string(),
+            source: "test".to_string(),
+            codex_cli: None,
+            error: None,
+            requires_auth: Some(false),
+            plan_type: Some("plus".to_string()),
+            rate_limits: Some(codex_app_server::CodexRateLimits {
+                limit_id: Some("codex".to_string()),
+                limit_name: None,
+                primary: Some(codex_app_server::RateLimitWindow {
+                    used_percent: Some(100),
+                    window_duration_mins: Some(300),
+                    resets_at: Some(1),
+                }),
+                secondary: None,
+                credits: None,
+                plan_type: Some("plus".to_string()),
+                rate_limit_reached_type: Some("primary".to_string()),
+            }),
+            rate_limit_reset_credits: None,
+        };
+
+        assert!(should_failover_for_rate_limits(&limited));
+        assert_eq!(
+            rate_limit_reached_from_status(&limited).as_deref(),
+            Some("primary")
+        );
+
+        let exhausted_without_signal = CodexRateLimitsStatus {
+            rate_limits: Some(codex_app_server::CodexRateLimits {
+                rate_limit_reached_type: None,
+                primary: Some(codex_app_server::RateLimitWindow {
+                    used_percent: Some(100),
+                    window_duration_mins: Some(300),
+                    resets_at: Some(1),
+                }),
+                ..Default::default()
+            }),
+            ..limited.clone()
+        };
+        assert!(!should_failover_for_rate_limits(&exhausted_without_signal));
     }
 }

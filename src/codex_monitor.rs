@@ -13,7 +13,8 @@ use crate::config::LauncherConfig;
 use crate::connection_watch::{
     self, ConnectionAlert, ConnectionAlertKind, EndpointHealth,
 };
-use crate::failover;
+use crate::codex_app_server;
+use crate::failover::{self, APP_SERVER_RATE_LIMIT_SOURCE};
 use crate::rate_limit_watch;
 use crate::session_checkpoint::{self, ProviderModeKind, SessionCheckpoint};
 
@@ -57,6 +58,7 @@ pub struct CodexMonitor {
     last_codex_api_ready: Option<bool>,
     last_endpoint_reachable: Option<bool>,
     last_codex_running: Option<bool>,
+    last_rate_limits_poll_signature: Option<String>,
 }
 
 impl CodexMonitor {
@@ -85,6 +87,7 @@ impl CodexMonitor {
             last_codex_api_ready: None,
             last_endpoint_reachable: None,
             last_codex_running: None,
+            last_rate_limits_poll_signature: None,
         }
     }
 
@@ -141,30 +144,16 @@ impl CodexMonitor {
 
         self.poll_connection_health(&config, &process, provider_mode, codex_api_ready);
 
+        if provider_mode == ProviderModeKind::CodexAccount {
+            self.poll_structured_rate_limits(&config);
+        }
+
         if process.running && codex_api_ready {
             self.poll_session_watch(
                 &config,
                 &process,
                 &settings,
                 provider_mode == ProviderModeKind::CodexAccount,
-            );
-        }
-
-        if provider_mode == ProviderModeKind::CodexAccount && self.poll_count.is_multiple_of(6) {
-            rate_limit_watch::log_event(
-                Some(self.root.as_path()),
-                "INFO",
-                "watch_heartbeat",
-                json!({
-                    "providerMode": "codexAccount",
-                    "codexRunning": process.running,
-                    "codexApiReady": codex_api_ready,
-                    "codexPid": process.pid,
-                    "codexDetectMethod": process.method,
-                    "pollCount": self.poll_count,
-                    "codexApiBaseUrl": config.codex_api_base_url(),
-                    "codexApiProbe": connection_watch::probe_codex_api_health(&config),
-                }),
             );
         }
 
@@ -284,21 +273,86 @@ impl CodexMonitor {
                     }
                 }
                 self.last_endpoint_reachable = Some(health.reachable);
-
-                if self.poll_count.is_multiple_of(6) {
-                    connection_watch::log_event(
-                        Some(self.root.as_path()),
-                        "INFO",
-                        "endpoint_heartbeat",
-                        json!({
-                            "providerMode": "localApi",
-                            "endpointHealth": health,
-                            "codexRunning": process.running,
-                            "codexApiReady": codex_api_ready,
-                        }),
-                    );
-                }
             }
+        }
+    }
+
+    fn poll_structured_rate_limits(&mut self, config: &LauncherConfig) {
+        if !self.poll_count.is_multiple_of(6) {
+            return;
+        }
+
+        let status = codex_app_server::read_rate_limits(config);
+        let signature = rate_limits_poll_signature(&status);
+        if self.last_rate_limits_poll_signature.as_deref() != Some(signature.as_str()) {
+            self.last_rate_limits_poll_signature = Some(signature);
+            rate_limit_watch::log_event(
+                Some(self.root.as_path()),
+                if status.ok { "INFO" } else { "WARN" },
+                "app_server_rate_limits_poll",
+                json!({
+                    "ok": status.ok,
+                    "error": status.error,
+                    "planType": status.plan_type,
+                    "rateLimitReachedType": codex_app_server::rate_limit_reached_type(&status),
+                    "snippet": codex_app_server::rate_limit_status_snippet(&status),
+                    "rateLimits": status.rate_limits,
+                }),
+            );
+        }
+
+        if failover::should_failover_for_rate_limits(&status) {
+            let reached_type =
+                failover::rate_limit_reached_from_status(&status).unwrap_or_default();
+            let alert = RateLimitAlert {
+                detected_at: Utc::now(),
+                matched_pattern: reached_type,
+                source: APP_SERVER_RATE_LIMIT_SOURCE.to_string(),
+                session_id: None,
+                snippet: codex_app_server::rate_limit_status_snippet(&status),
+                dismissed: false,
+            };
+
+            let checkpoint = failover::capture_checkpoint_from_running(
+                config,
+                &self.root,
+                "auto_rate_limit_structured",
+            )
+            .ok()
+            .flatten();
+
+            if let Some(ref saved) = checkpoint {
+                self.set_last_checkpoint(saved.clone());
+            }
+
+            rate_limit_watch::log_event(
+                Some(self.root.as_path()),
+                "WARN",
+                "rate_limit_structured",
+                json!({
+                    "rateLimitReachedType": alert.matched_pattern,
+                    "snippet": alert.snippet,
+                    "checkpoint": checkpoint,
+                    "rateLimits": status.rate_limits,
+                }),
+            );
+
+            self.push_alert(alert);
+            return;
+        }
+
+        if self.status.active_alert.as_ref().is_some_and(|alert| {
+            alert.source == APP_SERVER_RATE_LIMIT_SOURCE && !alert.dismissed
+        }) {
+            self.dismiss_alert();
+            rate_limit_watch::log_event(
+                Some(self.root.as_path()),
+                "INFO",
+                "rate_limit_cleared",
+                json!({
+                    "snippet": codex_app_server::rate_limit_status_snippet(&status),
+                }),
+            );
         }
     }
 
@@ -452,68 +506,41 @@ impl CodexMonitor {
                 if let Some(matched) =
                     failover::matches_rate_limit(&response.content, &settings.rate_limit_patterns)
                 {
-                let snippet = truncate(&response.content, 500);
-                let alert = RateLimitAlert {
-                    detected_at: Utc::now(),
-                    matched_pattern: matched.clone(),
-                    source: "session_response".to_string(),
-                    session_id: Some(session.session_id.clone()),
-                    snippet: snippet.clone(),
-                    dismissed: false,
-                };
-
-                let checkpoint = failover::capture_checkpoint_from_running(
-                    config,
-                    &self.root,
-                    "auto_rate_limit_candidate",
-                )
-                .ok()
-                .flatten();
-
-                if let Some(ref saved) = checkpoint {
-                    self.set_last_checkpoint(saved.clone());
-                }
-
-                rate_limit_watch::log_event(
-                    Some(self.root.as_path()),
-                    "WARN",
-                    "rate_limit_candidate",
-                    json!({
-                        "matchedPattern": matched,
-                        "sessionId": session.session_id,
-                        "createdAt": session.created_at,
-                        "role": response.role,
-                        "done": response.done,
-                        "responseContent": truncate(&response.content, 8000),
-                        "responseLength": response.content.len(),
-                        "patternsChecked": settings.rate_limit_patterns,
-                        "sessionCount": sessions.sessions.len(),
-                        "sessions": sessions.sessions,
-                        "codexApiProbe": connection_watch::probe_codex_api_health(config),
-                        "endpointHealth": connection_watch::probe_endpoint_health(config),
-                        "codexProcess": {
-                            "running": process.running,
-                            "pid": process.pid,
-                            "method": process.method,
-                        },
-                        "checkpoint": checkpoint,
-                    }),
-                );
-
-                self.push_alert(alert);
-                return;
+                    rate_limit_watch::log_event(
+                        Some(self.root.as_path()),
+                        "WARN",
+                        "rate_limit_text_candidate",
+                        json!({
+                            "matchedPattern": matched,
+                            "sessionId": session.session_id,
+                            "createdAt": session.created_at,
+                            "role": response.role,
+                            "done": response.done,
+                            "responseContent": truncate(&response.content, 8000),
+                            "responseLength": response.content.len(),
+                            "patternsChecked": settings.rate_limit_patterns,
+                            "note": "Text-only match is logged for discovery; auto-failover requires app-server rateLimitReachedType.",
+                            "sessionCount": sessions.sessions.len(),
+                            "codexApiProbe": connection_watch::probe_codex_api_health(config),
+                            "endpointHealth": connection_watch::probe_endpoint_health(config),
+                            "codexProcess": {
+                                "running": process.running,
+                                "pid": process.pid,
+                                "method": process.method,
+                            },
+                        }),
+                    );
                 }
             }
         }
     }
 
     fn push_alert(&mut self, alert: RateLimitAlert) {
-        if self
-            .status
-            .active_alert
-            .as_ref()
-            .is_some_and(|existing| existing.snippet == alert.snippet)
-        {
+        if self.status.active_alert.as_ref().is_some_and(|existing| {
+            existing.source == alert.source
+                && existing.matched_pattern == alert.matched_pattern
+                && existing.snippet == alert.snippet
+        }) {
             return;
         }
 
@@ -533,6 +560,16 @@ impl CodexMonitor {
         self.status.recent_connection_alerts.insert(0, alert);
         self.status.recent_connection_alerts.truncate(20);
     }
+}
+
+fn rate_limits_poll_signature(status: &codex_app_server::CodexRateLimitsStatus) -> String {
+    format!(
+        "{}|{}|{}|{}",
+        status.ok,
+        status.error.as_deref().unwrap_or(""),
+        codex_app_server::rate_limit_reached_type(status).unwrap_or_default(),
+        codex_app_server::rate_limit_status_snippet(status),
+    )
 }
 
 fn rate_limit_discovery_hint() -> String {

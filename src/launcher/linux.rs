@@ -22,6 +22,10 @@ fn common_path_commands_for_linux() -> &'static [&'static str] {
     &["codex"]
 }
 
+pub fn cli_install_paths() -> Vec<PathBuf> {
+    candidate_paths()
+}
+
 fn candidate_paths() -> Vec<PathBuf> {
     let mut paths = vec![
         PathBuf::from("/usr/local/bin/codex"),

@@ -47,6 +47,17 @@ pub fn launch_bundle(
     Ok(())
 }
 
+pub fn cli_install_paths() -> Vec<PathBuf> {
+    let mut paths = vec![
+        PathBuf::from("/usr/local/bin/codex"),
+        PathBuf::from("/opt/homebrew/bin/codex"),
+    ];
+    for bundle in candidate_bundles() {
+        paths.push(bundle.join("Contents/MacOS/Codex"));
+    }
+    paths
+}
+
 fn candidate_bundles() -> Vec<PathBuf> {
     let mut paths = vec![PathBuf::from("/Applications/Codex.app")];
     if let Some(home) = dirs::home_dir() {

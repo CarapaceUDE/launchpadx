@@ -1,0 +1,579 @@
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::thread;
+use std::time::Duration;
+
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::codex_thread_store;
+use crate::config::LauncherConfig;
+use crate::launcher;
+
+const INIT_REQUEST_ID: i64 = 0;
+const HANDSHAKE_DELAY_MS: u64 = 500;
+const READ_TIMEOUT_SECS: u64 = 25;
+const THREAD_LIST_LIMIT: u32 = 25;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitWindow {
+    pub used_percent: Option<u32>,
+    pub window_duration_mins: Option<u32>,
+    pub resets_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitCredits {
+    pub has_credits: Option<bool>,
+    pub unlimited: Option<bool>,
+    pub balance: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexRateLimits {
+    pub limit_id: Option<String>,
+    pub limit_name: Option<String>,
+    pub primary: Option<RateLimitWindow>,
+    pub secondary: Option<RateLimitWindow>,
+    pub credits: Option<RateLimitCredits>,
+    pub plan_type: Option<String>,
+    pub rate_limit_reached_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitResetCredits {
+    pub available_count: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexThreadSummary {
+    pub id: String,
+    pub name: Option<String>,
+    pub status: Option<String>,
+    pub path: Option<String>,
+    pub created_at: Option<String>,
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexThreadListStatus {
+    pub ok: bool,
+    pub fetched_at: String,
+    pub source: String,
+    pub codex_cli: Option<String>,
+    pub error: Option<String>,
+    pub threads: Vec<CodexThreadSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexRateLimitsStatus {
+    pub ok: bool,
+    pub fetched_at: String,
+    pub source: String,
+    pub codex_cli: Option<String>,
+    pub error: Option<String>,
+    pub requires_auth: Option<bool>,
+    pub plan_type: Option<String>,
+    pub rate_limits: Option<CodexRateLimits>,
+    pub rate_limit_reset_credits: Option<RateLimitResetCredits>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AppServerError {
+    #[error("could not start codex app-server: {0}")]
+    Spawn(String),
+    #[error("codex CLI not found on PATH; install Codex CLI or set codexCommand")]
+    CliNotFound,
+    #[error("app-server request timed out")]
+    Timeout,
+    #[error("app-server returned an error: {0}")]
+    Rpc(String),
+    #[error("could not parse app-server response: {0}")]
+    Parse(String),
+}
+
+pub fn list_threads(config: &LauncherConfig) -> CodexThreadListStatus {
+    let fetched_at = Utc::now().to_rfc3339();
+    if let Ok(status) = list_threads_via_app_server(config) {
+        return CodexThreadListStatus {
+            fetched_at,
+            ..status
+        };
+    }
+
+    if let Ok(threads) = codex_thread_store::list_threads_from_store(THREAD_LIST_LIMIT as usize) {
+        if !threads.is_empty() {
+            return CodexThreadListStatus {
+                ok: true,
+                fetched_at,
+                source: "codex ~/.codex/session_index.jsonl".to_string(),
+                codex_cli: None,
+                error: None,
+                threads,
+            };
+        }
+    }
+
+    let cli_candidates = resolve_codex_cli_candidates(config);
+    CodexThreadListStatus {
+        ok: false,
+        fetched_at,
+        source: "codex app-server thread/list".to_string(),
+        codex_cli: cli_candidates.first().cloned(),
+        error: Some(
+            "Could not reach Codex app-server or read local session index.".to_string(),
+        ),
+        threads: Vec::new(),
+    }
+}
+
+pub fn read_rate_limits(config: &LauncherConfig) -> CodexRateLimitsStatus {
+    let fetched_at = Utc::now().to_rfc3339();
+    if let Ok(status) = read_rate_limits_via_app_server(config) {
+        return CodexRateLimitsStatus {
+            fetched_at,
+            ..status
+        };
+    }
+
+    let cli_candidates = resolve_codex_cli_candidates(config);
+    CodexRateLimitsStatus {
+        ok: false,
+        fetched_at,
+        source: "codex app-server account/rateLimits/read".to_string(),
+        codex_cli: cli_candidates.first().cloned(),
+        error: Some(cli_discovery_error(
+            "Codex app-server unavailable".to_string(),
+            &cli_candidates,
+        )),
+        requires_auth: None,
+        plan_type: None,
+        rate_limits: None,
+        rate_limit_reset_credits: None,
+    }
+}
+
+struct AppServerClient {
+    child: Child,
+    stdin: ChildStdin,
+    reader: BufReader<ChildStdout>,
+    next_id: i64,
+}
+
+impl AppServerClient {
+    fn spawn(cli: &str) -> Result<Self, AppServerError> {
+        let mut child = Command::new(cli)
+            .args(["app-server", "--listen", "stdio://"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    AppServerError::CliNotFound
+                } else {
+                    AppServerError::Spawn(error.to_string())
+                }
+            })?;
+
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| AppServerError::Spawn("stdin unavailable".to_string()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| AppServerError::Spawn("stdout unavailable".to_string()))?;
+
+        Ok(Self {
+            child,
+            stdin,
+            reader: BufReader::new(stdout),
+            next_id: 1,
+        })
+    }
+
+    fn initialize(&mut self) -> Result<(), AppServerError> {
+        let init = serde_json::json!({
+            "method": "initialize",
+            "id": INIT_REQUEST_ID,
+            "params": {
+                "clientInfo": {
+                    "name": "codex_launchpad",
+                    "title": "Codex Launchpad",
+                    "version": "0.1.0"
+                }
+            }
+        });
+        write_request(&mut self.stdin, &init)?;
+        write_request(
+            &mut self.stdin,
+            &serde_json::json!({"method": "initialized", "params": {}}),
+        )?;
+        thread::sleep(Duration::from_millis(HANDSHAKE_DELAY_MS));
+
+        let init_response =
+            read_response_for_id(&mut self.reader, INIT_REQUEST_ID, READ_TIMEOUT_SECS)?;
+        if init_response.get("error").is_some() {
+            return Err(AppServerError::Rpc(
+                init_response
+                    .get("error")
+                    .and_then(|value| value.get("message"))
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("initialize failed")
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn call(&mut self, method: &str, params: Value) -> Result<Value, AppServerError> {
+        let request_id = self.next_id;
+        self.next_id += 1;
+        let payload = serde_json::json!({
+            "method": method,
+            "id": request_id,
+            "params": params,
+        });
+        write_request(&mut self.stdin, &payload)?;
+        let response = read_response_for_id(&mut self.reader, request_id, READ_TIMEOUT_SECS)?;
+        if let Some(error) = response.get("error") {
+            let message = error
+                .get("message")
+                .and_then(|value| value.as_str())
+                .unwrap_or(method);
+            return Err(AppServerError::Rpc(message.to_string()));
+        }
+        Ok(response.get("result").cloned().unwrap_or(Value::Null))
+    }
+}
+
+impl Drop for AppServerClient {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+fn read_rate_limits_via_cli(cli: &str) -> Result<CodexRateLimitsStatus, AppServerError> {
+    let mut client = AppServerClient::spawn(cli)?;
+    client.initialize()?;
+    let result = client.call("account/rateLimits/read", serde_json::json!({}))?;
+    parse_rate_limits_result(result, cli)
+}
+
+fn list_threads_via_cli(cli: &str) -> Result<CodexThreadListStatus, AppServerError> {
+    let mut client = AppServerClient::spawn(cli)?;
+    client.initialize()?;
+    let result = client.call(
+        "thread/list",
+        serde_json::json!({ "limit": THREAD_LIST_LIMIT }),
+    )?;
+    parse_thread_list_result(result, cli)
+}
+
+fn parse_thread_list_result(result: Value, cli: &str) -> Result<CodexThreadListStatus, AppServerError> {
+    let threads = extract_thread_rows(&result);
+    Ok(CodexThreadListStatus {
+        ok: true,
+        fetched_at: Utc::now().to_rfc3339(),
+        source: "codex app-server thread/list".to_string(),
+        codex_cli: Some(cli.to_string()),
+        error: None,
+        threads,
+    })
+}
+
+fn extract_thread_rows(result: &Value) -> Vec<CodexThreadSummary> {
+    let rows = result
+        .get("data")
+        .or_else(|| result.get("threads"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .or_else(|| {
+            result
+                .get("thread")
+                .map(|thread| vec![thread.clone()])
+        })
+        .unwrap_or_default();
+
+    rows.into_iter()
+        .filter_map(parse_thread_summary)
+        .collect()
+}
+
+fn parse_thread_summary(value: Value) -> Option<CodexThreadSummary> {
+    let id = value
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)?;
+    Some(CodexThreadSummary {
+        id,
+        name: value
+            .get("name")
+            .or_else(|| value.get("threadName"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        status: value
+            .get("status")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        path: value
+            .get("path")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+        created_at: value
+            .get("createdAt")
+            .or_else(|| value.get("created_at"))
+            .and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_i64().map(|n| n.to_string()))),
+        model: value
+            .get("model")
+            .or_else(|| value.pointer("/settings/model"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+    })
+}
+
+fn parse_rate_limits_result(
+    result: Value,
+    cli: &str,
+) -> Result<CodexRateLimitsStatus, AppServerError> {
+    let rate_limits: Option<CodexRateLimits> = result
+        .get("rateLimits")
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
+    let rate_limit_reset_credits: Option<RateLimitResetCredits> = result
+        .get("rateLimitResetCredits")
+        .and_then(|value| serde_json::from_value(value.clone()).ok());
+
+    let plan_type = rate_limits
+        .as_ref()
+        .and_then(|limits| limits.plan_type.clone());
+
+    Ok(CodexRateLimitsStatus {
+        ok: true,
+        fetched_at: Utc::now().to_rfc3339(),
+        source: "codex app-server account/rateLimits/read".to_string(),
+        codex_cli: Some(cli.to_string()),
+        error: None,
+        requires_auth: Some(false),
+        plan_type,
+        rate_limits,
+        rate_limit_reset_credits,
+    })
+}
+
+fn write_request(stdin: &mut std::process::ChildStdin, payload: &Value) -> Result<(), AppServerError> {
+    let line = serde_json::to_string(payload)
+        .map_err(|error| AppServerError::Parse(error.to_string()))?;
+    stdin
+        .write_all(line.as_bytes())
+        .and_then(|_| stdin.write_all(b"\n"))
+        .map_err(|error| AppServerError::Spawn(error.to_string()))
+}
+
+fn read_response_for_id(
+    reader: &mut BufReader<std::process::ChildStdout>,
+    request_id: i64,
+    timeout_secs: u64,
+) -> Result<Value, AppServerError> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+    let mut line_buf = String::new();
+
+    loop {
+        if std::time::Instant::now() > deadline {
+            return Err(AppServerError::Timeout);
+        }
+
+        line_buf.clear();
+        let bytes = reader
+            .read_line(&mut line_buf)
+            .map_err(|error| AppServerError::Parse(error.to_string()))?;
+        if bytes == 0 {
+            return Err(AppServerError::Timeout);
+        }
+
+        let trimmed = line_buf.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let value: Value =
+            serde_json::from_str(trimmed).map_err(|error| AppServerError::Parse(error.to_string()))?;
+
+        if value.get("id").and_then(|id| id.as_i64()) == Some(request_id) {
+            return Ok(value);
+        }
+    }
+}
+
+pub fn rate_limit_reached_type(status: &CodexRateLimitsStatus) -> Option<String> {
+    status
+        .rate_limits
+        .as_ref()
+        .and_then(|limits| limits.rate_limit_reached_type.clone())
+        .filter(|value| !value.trim().is_empty())
+}
+
+pub fn is_rate_limit_reached(status: &CodexRateLimitsStatus) -> bool {
+    rate_limit_reached_type(status).is_some()
+}
+
+pub fn rate_limit_status_snippet(status: &CodexRateLimitsStatus) -> String {
+    let limits = status.rate_limits.as_ref();
+    let primary = limits
+        .and_then(|value| value.primary.as_ref())
+        .and_then(|window| window.used_percent);
+    let secondary = limits
+        .and_then(|value| value.secondary.as_ref())
+        .and_then(|window| window.used_percent);
+    let reached = rate_limit_reached_type(status).unwrap_or_else(|| "unknown".to_string());
+    format!(
+        "rateLimitReachedType={reached}; primaryUsed={primary:?}%; secondaryUsed={secondary:?}%"
+    )
+}
+
+fn resolve_codex_cli_candidates(config: &LauncherConfig) -> Vec<String> {
+    launcher::cli_executable_candidates(config)
+}
+
+fn list_threads_via_app_server(
+    config: &LauncherConfig,
+) -> Result<CodexThreadListStatus, AppServerError> {
+    let mut last_error = None;
+    for cli in resolve_codex_cli_candidates(config) {
+        match list_threads_via_cli(&cli) {
+            Ok(mut status) => {
+                status.codex_cli = Some(cli);
+                return Ok(status);
+            }
+            Err(error) => last_error = Some(format!("{cli}: {error}")),
+        }
+    }
+    Err(last_error
+        .map(AppServerError::Rpc)
+        .unwrap_or(AppServerError::CliNotFound))
+}
+
+fn read_rate_limits_via_app_server(
+    config: &LauncherConfig,
+) -> Result<CodexRateLimitsStatus, AppServerError> {
+    let mut last_error = None;
+    for cli in resolve_codex_cli_candidates(config) {
+        match read_rate_limits_via_cli(&cli) {
+            Ok(mut status) => {
+                status.codex_cli = Some(cli);
+                return Ok(status);
+            }
+            Err(error) => last_error = Some(format!("{cli}: {error}")),
+        }
+    }
+    Err(last_error
+        .map(AppServerError::Rpc)
+        .unwrap_or(AppServerError::CliNotFound))
+}
+
+fn cli_discovery_error(last_error: String, candidates: &[String]) -> String {
+    let checked = candidates.join(", ");
+    format!("{last_error}. Checked: {checked}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_rate_limit_reached_type() {
+        let mut status = parse_rate_limits_result(
+            serde_json::json!({
+                "rateLimits": {
+                    "limitId": "codex",
+                    "primary": { "usedPercent": 100, "windowDurationMins": 300, "resetsAt": 1779459394 },
+                    "secondary": { "usedPercent": 10, "windowDurationMins": 10080, "resetsAt": 1779826837 },
+                    "planType": "plus",
+                    "rateLimitReachedType": "primary"
+                }
+            }),
+            "codex",
+        )
+        .expect("parse");
+        assert!(is_rate_limit_reached(&status));
+        assert_eq!(rate_limit_reached_type(&status).as_deref(), Some("primary"));
+
+        status.rate_limits.as_mut().unwrap().rate_limit_reached_type = None;
+        assert!(!is_rate_limit_reached(&status));
+    }
+
+    #[test]
+    fn parses_thread_list_payload() {
+        let threads = extract_thread_rows(&serde_json::json!({
+            "data": [
+                {
+                    "id": "thr_abc",
+                    "name": "Fix auth bug",
+                    "status": "notLoaded",
+                    "path": "/tmp/thread.json",
+                    "createdAt": "2026-06-01T10:00:00Z",
+                    "model": "gpt-5.4"
+                }
+            ]
+        }));
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].id, "thr_abc");
+        assert_eq!(threads[0].name.as_deref(), Some("Fix auth bug"));
+    }
+
+    #[test]
+    fn auto_discovers_threads_or_local_store_on_this_machine() {
+        let config = LauncherConfig::default();
+        let status = list_threads(&config);
+        if status.ok {
+            assert!(!status.threads.is_empty(), "expected threads from {:?}", status.source);
+            return;
+        }
+        assert!(
+            status.error.is_some(),
+            "expected either app-server or local session index data"
+        );
+    }
+
+    #[test]
+    fn parses_rate_limits_payload() {
+        let payload = serde_json::json!({
+            "rateLimits": {
+                "limitId": "codex",
+                "primary": { "usedPercent": 25, "windowDurationMins": 300, "resetsAt": 1779459394 },
+                "secondary": { "usedPercent": 18, "windowDurationMins": 10080, "resetsAt": 1779826837 },
+                "credits": { "hasCredits": true, "unlimited": false, "balance": "12.50" },
+                "planType": "plus",
+                "rateLimitReachedType": null
+            },
+            "rateLimitResetCredits": { "availableCount": 2 }
+        });
+
+        let status = parse_rate_limits_result(payload, "codex").expect("parse");
+        assert!(status.ok);
+        let limits = status.rate_limits.expect("limits");
+        assert_eq!(limits.plan_type.as_deref(), Some("plus"));
+        assert_eq!(
+            limits
+                .primary
+                .as_ref()
+                .and_then(|window| window.used_percent),
+            Some(25)
+        );
+        assert_eq!(
+            status
+                .rate_limit_reset_credits
+                .and_then(|credits| credits.available_count),
+            Some(2)
+        );
+    }
+}

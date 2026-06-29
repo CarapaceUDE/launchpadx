@@ -1,4 +1,4 @@
-import { Rocket, Boxes, Settings, FileText, Info, RefreshCw, ChevronRight } from "lucide-react";
+import { Rocket, Activity, Settings, FileText, Info, RefreshCw, ChevronRight } from "lucide-react";
 import { AppIcon } from "./AppIcon";
 import { ThemeToggle } from "./ThemeToggle";
 import type { NavKey } from "../../context/LauncherContext";
@@ -6,7 +6,7 @@ import { APP_NAME, LICENSE_NOTICE, LICENSE_URL } from "../../lib/branding";
 
 const items: { key: NavKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "launcher", label: "Launchpad", icon: Rocket },
-  { key: "models", label: "Models", icon: Boxes },
+  { key: "sessions", label: "Sessions", icon: Activity },
   { key: "settings", label: "Settings", icon: Settings },
   { key: "logs", label: "Logs", icon: FileText },
   { key: "about", label: "About", icon: Info },

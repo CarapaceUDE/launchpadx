@@ -1,4 +1,8 @@
 pub mod acp_client;
+pub mod codex_app_server;
+pub mod codex_thread_store;
+pub mod discovery_log;
+pub mod session_monitor;
 pub mod app_logic;
 pub mod branding;
 pub mod build_check;
