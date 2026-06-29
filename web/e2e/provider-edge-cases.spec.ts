@@ -65,7 +65,7 @@ test.describe("Provider edge cases", () => {
     await page.getByTestId("provider-activate-codex").click();
     await expect(page.getByTestId("provider-confirm-dialog")).toBeVisible();
     await expect(page.getByTestId("provider-confirm-dialog")).toContainText(
-      /restore snapshot|may not fully return/i,
+      /restore snapshot|switch Codex back to your account provider/i,
     );
   });
 });

@@ -12,6 +12,7 @@ import { normalizeConfig } from "../lib/endpoint";
 import {
   activeProviderMode,
   inspectionToProfile,
+  profileStillOnLocalProvider,
   shouldAutoSyncCodex,
   type CodexConfigInspection,
   type CodexProfileState,
@@ -731,7 +732,12 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         ),
         statusVariant: "success",
       }));
-      await inspectCodexProfile();
+      const refreshed = await inspectCodexProfile();
+      if (profileStillOnLocalProvider(refreshed)) {
+        throw new Error(
+          "Codex config still points to a local provider after switching to Codex Account.",
+        );
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       operationRef.current = "idle";
@@ -790,7 +796,9 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (resolved === "codex") return;
+      if (resolved === "codex" && !profileStillOnLocalProvider(codexProfileRef.current)) {
+        return;
+      }
       await revertCodexConfig();
     },
     [revertCodexConfig, syncCodexProfile, writeCodexConfig],

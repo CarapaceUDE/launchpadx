@@ -5,6 +5,16 @@ export type CodexProfileStatus = "unknown" | "missing" | "external" | "managed";
 /** Which provider Codex is configured to use. */
 export type ProviderMode = "codex" | "local";
 
+const LAUNCHER_PROVIDER_IDS = new Set([
+  "codex-launchpad",
+  "codex-local-launcher",
+  "codex_launchpad",
+]);
+
+export function isLauncherProviderId(id?: string): boolean {
+  return id ? LAUNCHER_PROVIDER_IDS.has(id) : false;
+}
+
 export interface CodexProfileState {
   status: CodexProfileStatus;
   model?: string;
@@ -53,8 +63,12 @@ export function inspectionToProfile(inspection: CodexConfigInspection): CodexPro
   };
 }
 
+export function profileStillOnLocalProvider(profile: CodexProfileState): boolean {
+  return profile.status === "managed" || isLauncherProviderId(profile.modelProvider);
+}
+
 export function activeProviderMode(profile: CodexProfileState): ProviderMode {
-  return profile.status === "managed" ? "local" : "codex";
+  return profileStillOnLocalProvider(profile) ? "local" : "codex";
 }
 
 export function providerModeLabel(mode: ProviderMode): string {
@@ -74,7 +88,7 @@ export function activeProviderSummary(
   endpoint?: string,
 ): string {
   if (mode === "local") {
-    const parts = [model, endpoint].filter(Boolean);
+    const parts = [model ?? profile.model, endpoint ?? profile.baseUrl].filter(Boolean);
     return parts.length > 0
       ? `Codex is using Local API · ${parts.join(" · ")}`
       : "Codex is using Local API";

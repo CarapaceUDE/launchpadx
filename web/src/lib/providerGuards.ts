@@ -78,7 +78,7 @@ export function codexAccountSwitchWarnings(
 
   if (profile.status === "managed" && !profile.restoreAvailable) {
     warnings.push(
-      "No restore snapshot was found. Your previous Codex profile may not fully return.",
+      "No restore snapshot was found. The launcher will still remove local provider settings and switch Codex back to your account provider when possible.",
     );
   }
   if (profile.status === "missing") {

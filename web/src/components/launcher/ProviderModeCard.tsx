@@ -7,6 +7,7 @@ import type { LauncherOperation } from "../../lib/operationStatus";
 import {
   activeProviderMode,
   activeProviderSummary,
+  profileStillOnLocalProvider,
   providerModeDescription,
   providerModeLabel,
   type CodexProfileState,
@@ -185,12 +186,14 @@ export function ProviderModeCard({
 
   const handleSelect = (mode: ProviderMode) => {
     if (switching || switchBlocked) return;
-    if (mode === resolvedMode) {
-      if (mode === "local" && canActivateLocal) onSelectMode("local");
+    if (mode === "codex") {
+      if (resolvedMode !== "codex" || profileStillOnLocalProvider(profile)) {
+        setConfirmCodex(true);
+      }
       return;
     }
-    if (mode === "codex") {
-      setConfirmCodex(true);
+    if (mode === resolvedMode) {
+      if (mode === "local" && canActivateLocal) onSelectMode("local");
       return;
     }
     if (!canActivateLocal) return;

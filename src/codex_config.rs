@@ -129,9 +129,14 @@ pub fn inspect(config: &LauncherConfig) -> Result<CodexConfigInspection, CodexCo
     let document = read_document(&config_path)?;
     let model = root_string(&document, "model");
     let model_provider = root_string(&document, "model_provider");
-    let managed_by_launcher = model_provider.as_deref() == Some(provider_id.as_str());
+    let managed_by_launcher = model_provider
+        .as_deref()
+        .map(|id| is_launcher_managed_provider(&document, id, provider_id.as_str()))
+        .unwrap_or(false);
     let launcher_base_url = if managed_by_launcher {
-        provider_string(&document, &provider_id, "base_url")
+        model_provider
+            .as_deref()
+            .and_then(|id| provider_string(&document, id, "base_url"))
     } else {
         None
     };
@@ -156,19 +161,33 @@ pub fn restore(config: &LauncherConfig) -> Result<(PathBuf, Option<String>), Cod
     let mut document = read_document(&config_path)?;
     let restore_state = read_restore_state(&config_path)?;
 
-    restore_root_values(&mut document, &provider_id, restore_state.as_ref());
-    remove_provider(&mut document, &provider_id);
+    let launcher_provider_ids = collect_launcher_provider_ids(&document, provider_id.as_str());
+    let on_launcher = root_string(&document, "model_provider")
+        .as_deref()
+        .is_some_and(|id| is_launcher_managed_provider(&document, id, provider_id.as_str()));
+
+    for launcher_id in &launcher_provider_ids {
+        remove_provider(&mut document, launcher_id);
+    }
+    if !launcher_provider_ids.iter().any(|id| id == &provider_id) {
+        remove_provider(&mut document, &provider_id);
+    }
+
+    if on_launcher {
+        revert_launcher_root_settings(&mut document, restore_state.as_ref());
+    }
+
+    if root_string(&document, "model_provider")
+        .as_deref()
+        .is_some_and(|id| is_launcher_managed_provider(&document, id, provider_id.as_str()))
+    {
+        revert_launcher_root_settings(&mut document, None);
+    }
+
     write_document(&config_path, &document)?;
+    clear_restore_state(&config_path);
 
-    let warning = match restore_state {
-        Some(_) => None,
-        None => Some(
-            "Could not restore your previous Codex model -- the restore state file is missing."
-                .to_string(),
-        ),
-    };
-
-    Ok((config_path, warning))
+    Ok((config_path, None))
 }
 
 fn read_document(path: &Path) -> Result<DocumentMut, CodexConfigError> {
@@ -221,8 +240,10 @@ fn save_restore_state_if_needed(
     document: &DocumentMut,
     settings: &PersistentCodexConfig,
 ) -> Result<(), CodexConfigError> {
-    if root_string(document, "model_provider").as_deref() == Some(&settings.provider_id) {
-        return Ok(());
+    if let Some(current) = root_string(document, "model_provider") {
+        if is_launcher_managed_provider(document, &current, settings.provider_id.as_str()) {
+            return Ok(());
+        }
     }
 
     let path = restore_state_path(&settings.config_path);
@@ -261,15 +282,7 @@ fn read_restore_state(path: &Path) -> Result<Option<RestoreState>, CodexConfigEr
         .map_err(|source| CodexConfigError::RestoreStateParse { path, source })
 }
 
-fn restore_root_values(
-    document: &mut DocumentMut,
-    provider_id: &str,
-    restore_state: Option<&RestoreState>,
-) {
-    if root_string(document, "model_provider").as_deref() != Some(provider_id) {
-        return;
-    }
-
+fn revert_launcher_root_settings(document: &mut DocumentMut, restore_state: Option<&RestoreState>) {
     if let Some(state) = restore_state {
         restore_root_string(document, "profile", state.had_profile, &state.profile);
         restore_root_string(document, "model", state.had_model, &state.model);
@@ -285,10 +298,119 @@ fn restore_root_values(
             state.had_model_catalog_json,
             &state.model_catalog_json,
         );
-    } else {
-        document.as_table_mut().remove("model");
-        document.as_table_mut().remove("model_catalog_json");
+        return;
     }
+
+    document.as_table_mut().remove("model");
+    document.as_table_mut().remove("model_catalog_json");
+
+    if let Some(account_provider) = infer_account_provider_id(document) {
+        document["model_provider"] = value(&account_provider);
+    } else {
+        document.as_table_mut().remove("model_provider");
+    }
+}
+
+fn collect_launcher_provider_ids(
+    document: &DocumentMut,
+    configured_provider_id: &str,
+) -> Vec<String> {
+    let mut ids = Vec::new();
+    if let Some(providers) = document.get("model_providers").and_then(Item::as_table) {
+        for (key, _) in providers.iter() {
+            let id = key.to_string();
+            if is_launcher_managed_provider(document, &id, configured_provider_id) {
+                ids.push(id);
+            }
+        }
+    }
+    if let Some(active) = root_string(document, "model_provider") {
+        if is_launcher_managed_provider(document, &active, configured_provider_id)
+            && !ids.iter().any(|id| id == &active)
+        {
+            ids.push(active);
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn infer_account_provider_id(document: &DocumentMut) -> Option<String> {
+    let providers = document.get("model_providers").and_then(Item::as_table)?;
+    let mut candidates: Vec<(i32, String)> = providers
+        .iter()
+        .filter_map(|(key, _)| {
+            let id = key.to_string();
+            if is_launcher_injected_provider(document, &id) {
+                return None;
+            }
+            Some((score_account_provider(document, &id), id))
+        })
+        .collect();
+
+    if candidates.is_empty() {
+        return None;
+    }
+
+    candidates.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    candidates.first().map(|(_, id)| id.clone())
+}
+
+fn score_account_provider(document: &DocumentMut, provider_id: &str) -> i32 {
+    let mut score = 0;
+    if provider_id == "openai" {
+        score += 100;
+    }
+
+    let Some(provider) = document
+        .get("model_providers")
+        .and_then(Item::as_table)
+        .and_then(|providers| providers.get(provider_id))
+        .and_then(Item::as_table)
+    else {
+        return score;
+    };
+
+    if provider
+        .get("requires_openai_auth")
+        .and_then(Item::as_bool)
+        .is_some_and(|required| required)
+    {
+        score += 50;
+    }
+
+    if let Some(base_url) = provider.get("base_url").and_then(Item::as_str) {
+        if base_url.contains("api.openai.com") {
+            score += 40;
+        }
+        if base_url.starts_with("https://") {
+            score += 10;
+        }
+        if is_local_base_url(base_url) {
+            score -= 100;
+        }
+    }
+
+    score
+}
+
+fn is_local_base_url(base_url: &str) -> bool {
+    let lower = base_url.to_ascii_lowercase();
+    lower.contains("127.0.0.1")
+        || lower.contains("localhost")
+        || lower.contains("0.0.0.0")
+        || lower.contains("[::1]")
+}
+
+fn is_launcher_injected_provider(document: &DocumentMut, provider_id: &str) -> bool {
+    is_known_launcher_provider_id(provider_id)
+        || provider_has_launcher_fingerprint(document, provider_id)
+}
+
+fn clear_restore_state(config_path: &Path) {
+    let path = restore_state_path(config_path);
+    let _ = fs::remove_file(path);
 }
 
 fn remove_provider(document: &mut DocumentMut, provider_id: &str) {
@@ -313,6 +435,50 @@ fn restore_root_string(
     } else {
         document.as_table_mut().remove(key);
     }
+}
+
+fn is_known_launcher_provider_id(id: &str) -> bool {
+    matches!(
+        id,
+        "codex-launchpad" | "codex-local-launcher" | "codex_launchpad"
+    )
+}
+
+fn provider_has_launcher_fingerprint(document: &DocumentMut, provider_id: &str) -> bool {
+    let Some(provider) = document
+        .get("model_providers")
+        .and_then(Item::as_table)
+        .and_then(|providers| providers.get(provider_id))
+        .and_then(Item::as_table)
+    else {
+        return false;
+    };
+
+    let wire_api = provider.get("wire_api").and_then(Item::as_str);
+    let requires_auth = provider.get("requires_openai_auth").and_then(Item::as_bool);
+    let has_bearer = provider.contains_key("experimental_bearer_token");
+    let has_env_key = provider
+        .get("env_key")
+        .and_then(Item::as_str)
+        .is_some_and(|key| key == ENV_KEY_NAME);
+
+    wire_api == Some("responses")
+        && requires_auth == Some(false)
+        && (has_bearer || has_env_key)
+}
+
+fn is_launcher_managed_provider(
+    document: &DocumentMut,
+    provider_id: &str,
+    configured_provider_id: &str,
+) -> bool {
+    if provider_id == configured_provider_id {
+        return true;
+    }
+    if is_known_launcher_provider_id(provider_id) {
+        return true;
+    }
+    provider_has_launcher_fingerprint(document, provider_id)
 }
 
 fn provider_string(document: &DocumentMut, provider_id: &str, key: &str) -> Option<String> {
@@ -511,7 +677,7 @@ name = "Local Ollama"
             model_catalog_json: None,
         };
 
-        restore_root_values(&mut document, "codex-launchpad", Some(&state));
+        revert_launcher_root_settings(&mut document, Some(&state));
         remove_provider(&mut document, "codex-launchpad");
         let text = document.to_string();
 
@@ -606,23 +772,258 @@ base_url = "http://127.0.0.1:11434/v1"
     }
 
     #[test]
+    fn restore_handles_legacy_provider_id_mismatch() {
+        let dir = std::env::temp_dir().join(format!(
+            "codex-launcher-legacy-restore-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+model = "qwen3.635b-a3b-coding-mxfp8"
+model_provider = "codex-local-launcher"
+
+[model_providers.codex-local-launcher]
+name = "codex-local-launcher"
+base_url = "http://127.0.0.1:11434/v1"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "test-key"
+"#,
+        )
+        .expect("seed config");
+
+        let backup_dir = dir.join("backups").join(BACKUP_DIR_NAME);
+        std::fs::create_dir_all(&backup_dir).expect("create backup dir");
+        let restore_state = RestoreState {
+            had_profile: false,
+            profile: None,
+            had_model: true,
+            model: Some("gpt-5.5".to_string()),
+            had_model_provider: true,
+            model_provider: Some("openai".to_string()),
+            had_model_catalog_json: false,
+            model_catalog_json: None,
+        };
+        std::fs::write(
+            backup_dir.join("restore-state.json"),
+            serde_json::to_vec_pretty(&restore_state).expect("serialize restore state"),
+        )
+        .expect("write restore state");
+
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            ..LauncherConfig::default()
+        };
+
+        let inspection = inspect(&launcher).expect("inspect legacy config");
+        assert!(inspection.managed_by_launcher);
+        assert_eq!(
+            inspection.model_provider.as_deref(),
+            Some("codex-local-launcher")
+        );
+
+        let (restored_path, warning) = restore(&launcher).expect("restore legacy config");
+        assert!(warning.is_none());
+        assert_eq!(restored_path, path);
+
+        let document = read_document(&path).expect("read restored");
+        assert_eq!(root_string(&document, "model").as_deref(), Some("gpt-5.5"));
+        assert_eq!(
+            root_string(&document, "model_provider").as_deref(),
+            Some("openai")
+        );
+        assert!(!document.to_string().contains("codex-local-launcher"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn restore_does_not_change_root_values_when_not_active_provider() {
-        let mut document = r#"
+        let dir = std::env::temp_dir().join(format!(
+            "codex-launcher-inactive-restore-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
 model = "gpt-5.5"
 model_provider = "openai"
 
+[model_providers.openai]
+name = "OpenAI"
+base_url = "https://api.openai.com/v1"
+
 [model_providers.codex-launchpad]
 name = "Local Ollama"
-"#
-        .parse::<DocumentMut>()
-        .expect("valid TOML");
+base_url = "http://127.0.0.1:11434/v1"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "test-key"
+"#,
+        )
+        .expect("seed config");
 
-        restore_root_values(&mut document, "codex-launchpad", None);
-        remove_provider(&mut document, "codex-launchpad");
-        let text = document.to_string();
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            ..LauncherConfig::default()
+        };
 
-        assert!(text.contains(r#"model = "gpt-5.5""#));
-        assert!(text.contains(r#"model_provider = "openai""#));
-        assert!(!text.contains("Local Ollama"));
+        restore(&launcher).expect("restore inactive launcher block");
+
+        let document = read_document(&path).expect("read restored");
+        assert_eq!(root_string(&document, "model").as_deref(), Some("gpt-5.5"));
+        assert_eq!(
+            root_string(&document, "model_provider").as_deref(),
+            Some("openai")
+        );
+        assert!(!document.to_string().contains("codex-launchpad"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restore_without_snapshot_infers_account_provider_from_config() {
+        let dir = std::env::temp_dir().join(format!(
+            "codex-launcher-infer-restore-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+model = "qwen3.635b-a3b-coding-mxfp8"
+model_provider = "codex-local-launcher"
+
+[model_providers.openai]
+name = "OpenAI"
+base_url = "https://api.openai.com/v1"
+requires_openai_auth = true
+
+[model_providers.codex-local-launcher]
+name = "codex-local-launcher"
+base_url = "http://127.0.0.1:11434/v1"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "test-key"
+"#,
+        )
+        .expect("seed config");
+
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            ..LauncherConfig::default()
+        };
+
+        let (restored_path, warning) = restore(&launcher).expect("restore without snapshot");
+        assert!(warning.is_none());
+        assert_eq!(restored_path, path);
+
+        let document = read_document(&path).expect("read restored");
+        assert!(root_string(&document, "model").is_none());
+        assert_eq!(
+            root_string(&document, "model_provider").as_deref(),
+            Some("openai")
+        );
+        assert!(!document.to_string().contains("codex-local-launcher"));
+        assert!(document.to_string().contains("[model_providers.openai]"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restore_fixes_orphan_launcher_model_provider_without_provider_block() {
+        let dir = std::env::temp_dir().join(format!(
+            "codex-launcher-orphan-root-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+model = "qwen3.635b-a3b-coding-mxfp8"
+model_provider = "codex-local-launcher"
+
+[model_providers.openai]
+name = "OpenAI"
+base_url = "https://api.openai.com/v1"
+requires_openai_auth = true
+"#,
+        )
+        .expect("seed config");
+
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            ..LauncherConfig::default()
+        };
+
+        let inspection = inspect(&launcher).expect("inspect orphan root");
+        assert!(inspection.managed_by_launcher);
+
+        restore(&launcher).expect("restore orphan root");
+
+        let document = read_document(&path).expect("read restored");
+        assert!(root_string(&document, "model").is_none());
+        assert_eq!(
+            root_string(&document, "model_provider").as_deref(),
+            Some("openai")
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn restore_without_snapshot_falls_back_to_account_sign_in() {
+        let dir = std::env::temp_dir().join(format!(
+            "codex-launcher-signin-restore-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+model = "llama3.2"
+model_provider = "codex-launchpad"
+
+[model_providers.codex-launchpad]
+name = "Local Ollama"
+base_url = "http://127.0.0.1:11434/v1"
+wire_api = "responses"
+requires_openai_auth = false
+experimental_bearer_token = "test-key"
+"#,
+        )
+        .expect("seed config");
+
+        let launcher = LauncherConfig {
+            codex_config_path: Some(path.to_string_lossy().to_string()),
+            codex_provider_id: Some("codex-launchpad".to_string()),
+            ..LauncherConfig::default()
+        };
+
+        restore(&launcher).expect("restore to account sign-in");
+
+        let document = read_document(&path).expect("read restored");
+        assert!(root_string(&document, "model").is_none());
+        assert!(root_string(&document, "model_provider").is_none());
+        assert!(!document.to_string().contains("codex-launchpad"));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

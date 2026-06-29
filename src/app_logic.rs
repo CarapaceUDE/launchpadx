@@ -790,10 +790,14 @@ pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Er
 
     let (restored_path, warning) = codex_config::restore(config)?;
     let message = if let Some(w) = warning {
-        format!("Reverted Codex config -- {w}", w = w)
+        format!(
+            "Switched Codex back to account provider at {} -- {w}",
+            restored_path.display(),
+            w = w
+        )
     } else {
         format!(
-            "Reverted Codex config to first backup: {}",
+            "Switched Codex back to account provider: {}",
             restored_path.display()
         )
     };
