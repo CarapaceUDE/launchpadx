@@ -34,6 +34,18 @@ agent-tools/
 codex-launchpad/
 codex-launchpad-src/
 mcps/
+terminals/
+
+# Runtime state written during local Codex runs
+.codex.pid
+
+# WebView2 / Edge profiles (cookies, cache, session storage)
+*.WebView2/
+**/EBWebView/
+
+# Local release/download staging at repo root (user paths, GH run artifacts)
+/release/
+/artifacts/
 
 # Logs and diagnostics
 *.log
