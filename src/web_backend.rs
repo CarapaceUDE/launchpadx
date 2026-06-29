@@ -1,7 +1,10 @@
 use crate::app_logic;
+use crate::codex_monitor::{CodexMonitor, spawn_monitor};
 use crate::codex_process;
 use crate::config::LauncherConfig;
+use crate::failover;
 use crate::launcher;
+use crate::session_checkpoint;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -18,6 +21,7 @@ use wry::WebViewAttributes;
 pub struct RpcState {
     pub config_path: PathBuf,
     pub root: PathBuf,
+    pub monitor: Arc<Mutex<CodexMonitor>>,
 }
 
 const ICON_FILENAME: &str = "icon.ico";
@@ -298,10 +302,12 @@ pub fn serve_web_ui(
     );
 
     let dist_dir = ensure_dist_dir(&root)?;
-    let state = Arc::new(Mutex::new(RpcState {
-        config_path,
-        root: root.clone(),
-    }));
+    let state = new_rpc_state(config_path, root.clone());
+    let (monitor_config_path, monitor) = {
+        let guard = state.lock().expect("rpc state");
+        (guard.config_path.clone(), Arc::clone(&guard.monitor))
+    };
+    let _monitor_handle = spawn_monitor(monitor_config_path, root.clone(), monitor);
 
     let (server, server_url) = start_server(port)?;
     println!("CODEX_LAUNCHER_READY={server_url}");
@@ -349,10 +355,16 @@ pub fn launch_web_gui(
         dist_dir.exists()
     );
 
-    let state = Arc::new(Mutex::new(RpcState {
-        config_path,
-        root: root.clone(),
-    }));
+    let state = new_rpc_state(config_path, root.clone());
+    let monitor_arc = {
+        let guard = state.lock().expect("rpc state");
+        Arc::clone(&guard.monitor)
+    };
+    let _monitor_handle = spawn_monitor(
+        state.lock().expect("rpc state").config_path.clone(),
+        root.clone(),
+        monitor_arc,
+    );
 
     let (server, server_url) = start_server(None)?;
     gui_log!(
@@ -448,6 +460,22 @@ fn start_server(
     Ok((server, url))
 }
 
+fn new_rpc_state(config_path: PathBuf, root: PathBuf) -> Arc<Mutex<RpcState>> {
+    let settings = LauncherConfig::read(&config_path)
+        .map(|config| config.failover.clone().unwrap_or_default())
+        .unwrap_or_default();
+    let monitor = Arc::new(Mutex::new(CodexMonitor::new(
+        config_path.clone(),
+        root.clone(),
+        &settings,
+    )));
+    Arc::new(Mutex::new(RpcState {
+        config_path,
+        root,
+        monitor,
+    }))
+}
+
 fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serde_json::Value {
     match method {
         "loadConfig" => rpc_load_config(state),
@@ -467,6 +495,13 @@ fn handle_rpc(state: &RpcState, method: &str, params: serde_json::Value) -> serd
         "setAutoStart" => rpc_set_auto_start(state, params),
         "openDirectoryPicker" => rpc_open_directory_picker(),
         "getAppLogs" => rpc_get_app_logs(state),
+        "getFailoverStatus" => rpc_get_failover_status(state),
+        "dismissFailoverAlert" => rpc_dismiss_failover_alert(state),
+        "failoverToLocal" => rpc_failover_to_local(state, params),
+        "captureSessionCheckpoint" => rpc_capture_session_checkpoint(state, params),
+        "listSessionCheckpoints" => rpc_list_session_checkpoints(),
+        "listCodexSessions" => rpc_list_codex_sessions(state),
+        "probeCodexApi" => rpc_probe_codex_api(state, params),
         _ => serde_json::json!({"error": format!("Unknown method: {}", method)}),
     }
 }
@@ -787,6 +822,117 @@ fn rpc_get_app_logs(state: &RpcState) -> serde_json::Value {
         Err(_) => Vec::new(),
     };
     serde_json::json!({"logs": entries})
+}
+
+fn rpc_get_failover_status(state: &RpcState) -> serde_json::Value {
+    let monitor = state.monitor.lock().expect("monitor mutex");
+    serde_json::to_value(monitor.status()).unwrap_or_else(|error| {
+        serde_json::json!({"error": format!("Failed to serialize failover status: {error}")})
+    })
+}
+
+fn rpc_dismiss_failover_alert(state: &RpcState) -> serde_json::Value {
+    let mut monitor = state.monitor.lock().expect("monitor mutex");
+    monitor.dismiss_alert();
+    serde_json::json!({"ok": true})
+}
+
+fn rpc_failover_to_local(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match LauncherConfig::read(&state.config_path) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error.to_string()}),
+    };
+    let profile_name = params
+        .get("profileName")
+        .and_then(|value| value.as_str());
+    let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+
+    match failover::run_manual_failover(
+        &config,
+        &state.root,
+        &pid_file,
+        profile_name,
+        "manual_ui",
+    ) {
+        Ok(result) => {
+            if let Some(checkpoint) = result.checkpoint.clone() {
+                if let Ok(mut monitor) = state.monitor.lock() {
+                    monitor.set_last_checkpoint(checkpoint);
+                    monitor.dismiss_alert();
+                }
+            }
+            serde_json::json!({
+                "ok": true,
+                "message": result.message,
+                "profileName": result.profile_name,
+                "resumePrompt": result.resume_prompt,
+                "checkpoint": result.checkpoint,
+            })
+        }
+        Err(error) => serde_json::json!({"error": error.to_string()}),
+    }
+}
+
+fn rpc_capture_session_checkpoint(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match LauncherConfig::read(&state.config_path) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error.to_string()}),
+    };
+    let trigger = params
+        .get("trigger")
+        .and_then(|value| value.as_str())
+        .unwrap_or("manual_rpc");
+
+    match failover::capture_checkpoint_from_running(&config, &state.root, trigger) {
+        Ok(Some(checkpoint)) => {
+            if let Ok(mut monitor) = state.monitor.lock() {
+                monitor.set_last_checkpoint(checkpoint.clone());
+            }
+            serde_json::json!({"ok": true, "checkpoint": checkpoint})
+        }
+        Ok(None) => serde_json::json!({"ok": true, "checkpoint": null}),
+        Err(error) => serde_json::json!({"error": error.to_string()}),
+    }
+}
+
+fn rpc_list_session_checkpoints() -> serde_json::Value {
+    match session_checkpoint::list_checkpoints() {
+        Ok(checkpoints) => serde_json::json!({"checkpoints": checkpoints}),
+        Err(error) => serde_json::json!({"error": error.to_string()}),
+    }
+}
+
+fn rpc_list_codex_sessions(state: &RpcState) -> serde_json::Value {
+    let config = match LauncherConfig::read(&state.config_path) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error.to_string()}),
+    };
+
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => return serde_json::json!({"error": error.to_string()}),
+    };
+
+    let client = match crate::acp_client::AcpClient::from_config(&config) {
+        Ok(client) => client,
+        Err(error) => return serde_json::json!({"error": error.to_string()}),
+    };
+
+    match runtime.block_on(client.list_sessions()) {
+        Ok(list) => serde_json::json!({"sessions": list.sessions}),
+        Err(error) => serde_json::json!({"error": error.to_string()}),
+    }
+}
+
+fn rpc_probe_codex_api(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+    let config = match config_for_request(state, &params) {
+        Ok(config) => config,
+        Err(error) => return serde_json::json!({"error": error}),
+    };
+    failover::probe_codex_api(&config)
 }
 
 fn rpc_toggle_auto_start(state: &RpcState) -> serde_json::Value {

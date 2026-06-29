@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -62,6 +65,88 @@ pub struct LauncherConfig {
     pub discover_ollama_models: Option<bool>,
     pub codex_args: Option<Vec<String>>,
     pub working_directory: Option<String>,
+    pub failover: Option<FailoverSettings>,
+    pub profiles: Option<HashMap<String, ProfileOverlay>>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FailoverSettings {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub auto_switch: bool,
+    #[serde(default = "default_monitor_interval")]
+    pub monitor_interval_secs: u64,
+    #[serde(default = "default_rate_limit_patterns")]
+    pub rate_limit_patterns: Vec<String>,
+    #[serde(default)]
+    pub fallback_chain: Vec<String>,
+}
+
+fn default_monitor_interval() -> u64 {
+    10
+}
+
+pub fn default_rate_limit_patterns() -> Vec<String> {
+    vec![
+        "out of messages".to_string(),
+        "rate limit".to_string(),
+        "quota exceeded".to_string(),
+        "usage limit".to_string(),
+        "message limit".to_string(),
+        "too many requests".to_string(),
+    ]
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileOverlay {
+    pub openai_base_url: Option<String>,
+    pub ollama_ip: Option<String>,
+    pub ollama_port: Option<u16>,
+    pub ollama_scheme: Option<String>,
+    pub api_key: Option<String>,
+    pub codex_model: Option<String>,
+    pub codex_provider_id: Option<String>,
+    pub codex_provider_name: Option<String>,
+    pub codex_api_key_mode: Option<ApiKeyMode>,
+    pub working_directory: Option<String>,
+}
+
+impl ProfileOverlay {
+    pub fn apply_to(&self, config: &mut LauncherConfig) {
+        if let Some(value) = &self.openai_base_url {
+            config.openai_base_url = Some(value.clone());
+        }
+        if let Some(value) = &self.ollama_ip {
+            config.ollama_ip = Some(value.clone());
+        }
+        if let Some(value) = self.ollama_port {
+            config.ollama_port = Some(value);
+        }
+        if let Some(value) = &self.ollama_scheme {
+            config.ollama_scheme = Some(value.clone());
+        }
+        if let Some(value) = &self.api_key {
+            config.api_key = Some(value.clone());
+        }
+        if let Some(value) = &self.codex_model {
+            config.codex_model = Some(value.clone());
+        }
+        if let Some(value) = &self.codex_provider_id {
+            config.codex_provider_id = Some(value.clone());
+        }
+        if let Some(value) = &self.codex_provider_name {
+            config.codex_provider_name = Some(value.clone());
+        }
+        if let Some(value) = self.codex_api_key_mode {
+            config.codex_api_key_mode = Some(value);
+        }
+        if let Some(value) = &self.working_directory {
+            config.working_directory = Some(value.clone());
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -165,6 +250,10 @@ impl LauncherConfig {
         );
         merge_option(&mut self.codex_args, &other.codex_args);
         merge_option(&mut self.working_directory, &other.working_directory);
+        merge_option(&mut self.failover, &other.failover);
+        if other.profiles.is_some() {
+            self.profiles = other.profiles.clone();
+        }
     }
 
     pub fn api_key(&self) -> Result<String, ConfigError> {

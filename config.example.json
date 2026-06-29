@@ -16,5 +16,29 @@
     "codexApiPort": 4000,
     "codexApiScheme": "http",
     "codexArgs": [],
-    "workingDirectory": ""
+    "workingDirectory": "",
+    "failover": {
+        "enabled": false,
+        "autoSwitch": false,
+        "monitorIntervalSecs": 10,
+        "rateLimitPatterns": [
+            "out of messages",
+            "rate limit",
+            "quota exceeded",
+            "usage limit",
+            "message limit",
+            "too many requests"
+        ],
+        "fallbackChain": ["local-ollama"]
+    },
+    "profiles": {
+        "local-ollama": {
+            "ollamaIp": "100.64.0.10",
+            "ollamaPort": 11434,
+            "ollamaScheme": "http",
+            "codexModel": "",
+            "codexProviderId": "codex-launchpad",
+            "codexProviderName": "Local Ollama"
+        }
+    }
 }

@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { LauncherConfig, ModelInfo } from "../types";
+import type { FailoverStatus, LauncherConfig, ModelInfo } from "../types";
 import { normalizeConfig } from "../lib/endpoint";
 import {
   activeProviderMode,
@@ -70,6 +70,7 @@ interface LauncherState {
   codexSyncing: boolean;
   writingCodex: boolean;
   revertingCodex: boolean;
+  failoverStatus: FailoverStatus;
 }
 
 interface LauncherContextValue extends LauncherState {
@@ -83,6 +84,10 @@ interface LauncherContextValue extends LauncherState {
   selectModel: (model: string) => Promise<void>;
   setAutoStart: (enabled: boolean) => Promise<void>;
   getAppLogs: () => Promise<LogEntry[]>;
+  refreshFailoverStatus: () => Promise<void>;
+  failoverToLocal: (profileName?: string) => Promise<void>;
+  dismissFailoverAlert: () => Promise<void>;
+  copyResumePrompt: () => Promise<void>;
 }
 
 const LauncherContext = createContext<LauncherContextValue | null>(null);
@@ -90,6 +95,14 @@ const LauncherContext = createContext<LauncherContextValue | null>(null);
 const SAVE_DEBOUNCE_MS = 800;
 const CODEX_SYNC_DEBOUNCE_MS = 1200;
 const HEALTH_POLL_MS = 4000;
+const FAILOVER_POLL_MS = 10000;
+
+const EMPTY_FAILOVER_STATUS: FailoverStatus = {
+  enabled: false,
+  autoSwitch: false,
+  monitoring: false,
+  recentAlerts: [],
+};
 
 const CODEX_SYNC_KEYS: Array<keyof LauncherConfig> = [
   "codexModel",
@@ -143,6 +156,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     codexSyncing: false,
     writingCodex: false,
     revertingCodex: false,
+    failoverStatus: EMPTY_FAILOVER_STATUS,
   });
 
   const configRef = useRef<LauncherConfig>({});
@@ -151,6 +165,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const codexSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const healthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const failoverPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const saveGenerationRef = useRef(0);
   const modelsRef = useRef<ModelInfo[]>([]);
   const codexProfileRef = useRef<CodexProfileState>(state.codexProfile);
@@ -462,6 +477,116 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
 
     return () => clearHealthPoll();
   }, [clearHealthPoll, healthCheck]);
+
+  const refreshFailoverStatus = useCallback(async () => {
+    try {
+      const result = await window.codexRPC.getFailoverStatus();
+      const status = unwrap<FailoverStatus>(result);
+      setState((prev) => ({ ...prev, failoverStatus: status }));
+    } catch {
+      // Failover monitoring is optional; ignore transient RPC errors.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshFailoverStatus();
+    failoverPollRef.current = setInterval(() => {
+      void refreshFailoverStatus();
+    }, FAILOVER_POLL_MS);
+    return () => {
+      if (failoverPollRef.current) {
+        clearInterval(failoverPollRef.current);
+        failoverPollRef.current = null;
+      }
+    };
+  }, [refreshFailoverStatus]);
+
+  const failoverToLocal = useCallback(
+    async (profileName?: string) => {
+      setOperation(
+        "failover_switching",
+        "Codex quota hit — switching to local provider and restarting...",
+      );
+      try {
+        const result = await window.codexRPC.failoverToLocal(profileName);
+        const payload = unwrap<{
+          message?: string;
+          resumePrompt?: string;
+        }>(result);
+        operationRef.current = "idle";
+        setState((prev) => ({
+          ...prev,
+          operation: "idle",
+          statusMessage:
+            payload.message ??
+            "Failover complete. Paste the resume prompt into Codex to continue.",
+          statusVariant: "success",
+        }));
+        await inspectCodexProfile();
+        await healthCheck(true);
+        await refreshFailoverStatus();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        operationRef.current = "idle";
+        setState((prev) => ({
+          ...prev,
+          operation: "idle",
+          statusMessage: `Failover failed: ${msg}`,
+          statusVariant: "error",
+        }));
+      }
+    },
+    [healthCheck, inspectCodexProfile, refreshFailoverStatus, setOperation],
+  );
+
+  const dismissFailoverAlert = useCallback(async () => {
+    try {
+      await window.codexRPC.dismissFailoverAlert();
+      await refreshFailoverStatus();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState((prev) => ({
+        ...prev,
+        statusMessage: `Could not dismiss failover alert: ${msg}`,
+        statusVariant: "error",
+      }));
+    }
+  }, [refreshFailoverStatus]);
+
+  const copyResumePrompt = useCallback(async () => {
+    const prompt =
+      state.failoverStatus.lastCheckpoint?.resumePrompt ??
+      (await window.codexRPC
+        .listSessionCheckpoints()
+        .then((result) => {
+          const payload = unwrap<{ checkpoints?: { resumePrompt?: string }[] }>(result);
+          return payload.checkpoints?.[0]?.resumePrompt;
+        })
+        .catch(() => undefined));
+    if (!prompt) {
+      setState((prev) => ({
+        ...prev,
+        statusMessage: "No resume prompt is available yet. Run failover or capture a checkpoint.",
+        statusVariant: "error",
+      }));
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setState((prev) => ({
+        ...prev,
+        statusMessage: "Resume prompt copied. Paste it into Codex after restart.",
+        statusVariant: "success",
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState((prev) => ({
+        ...prev,
+        statusMessage: `Could not copy resume prompt: ${msg}`,
+        statusVariant: "error",
+      }));
+    }
+  }, [state.failoverStatus.lastCheckpoint?.resumePrompt]);
 
   const refreshModels = useCallback(async (): Promise<void> => {
     setOperation("refreshing_models", "Refreshing models from endpoint...");
@@ -926,6 +1051,10 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     selectModel,
     setAutoStart,
     getAppLogs,
+    refreshFailoverStatus,
+    failoverToLocal,
+    dismissFailoverAlert,
+    copyResumePrompt,
   };
 
   return <LauncherContext.Provider value={value}>{children}</LauncherContext.Provider>;

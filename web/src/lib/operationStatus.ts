@@ -9,7 +9,8 @@ export type LauncherOperation =
   | "syncing_codex"
   | "writing_codex"
   | "reverting_codex"
-  | "selecting_model";
+  | "selecting_model"
+  | "failover_switching";
 
 export function isBusyOperation(op: LauncherOperation): boolean {
   return op !== "idle";
@@ -37,6 +38,8 @@ export function operationLabel(op: LauncherOperation): string {
       return "Switching";
     case "selecting_model":
       return "Updating model";
+    case "failover_switching":
+      return "Failover";
     default:
       return "";
   }
@@ -67,7 +70,8 @@ export function blocksLaunchToggle(op: LauncherOperation): boolean {
     op === "stopping" ||
     op === "waiting_for_codex" ||
     op === "writing_codex" ||
-    op === "reverting_codex"
+    op === "reverting_codex" ||
+    op === "failover_switching"
   );
 }
 
@@ -79,6 +83,7 @@ export function shouldPreserveOperationStatus(op: LauncherOperation): boolean {
     op === "writing_codex" ||
     op === "reverting_codex" ||
     op === "selecting_model" ||
-    op === "initializing"
+    op === "initializing" ||
+    op === "failover_switching"
   );
 }

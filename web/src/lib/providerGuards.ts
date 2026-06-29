@@ -19,6 +19,7 @@ const PROVIDER_SWITCH_BLOCKERS: LauncherOperation[] = [
   "syncing_codex",
   "refreshing_models",
   "selecting_model",
+  "failover_switching",
 ];
 
 export function blocksProviderSwitch(operation: LauncherOperation): GuardResult {

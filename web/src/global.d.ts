@@ -1,7 +1,12 @@
 /// <reference types="vite/client" />
 
 import type { CodexConfigInspection } from './lib/codexProfile';
-import type { LauncherConfig, CodexProcessInfo } from './types';
+import type {
+    FailoverStatus,
+    LauncherConfig,
+    CodexProcessInfo,
+    SessionCheckpoint,
+} from './types';
 
 interface LauncherResponse<T> {
     ok: boolean;
@@ -35,6 +40,13 @@ interface CodexIPC {
     saveSettings(settings: Record<string, unknown>): Promise<LauncherResponse<{ message?: string }>>;
     toggleAutoStart(): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
     setAutoStart(enabled: boolean): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
+    getFailoverStatus(): Promise<LauncherResponse<FailoverStatus>>;
+    dismissFailoverAlert(): Promise<LauncherResponse<{ ok?: boolean }>>;
+    failoverToLocal(profileName?: string): Promise<LauncherResponse<{ ok?: boolean; message?: string; profileName?: string; resumePrompt?: string; checkpoint?: SessionCheckpoint }>>;
+    captureSessionCheckpoint(trigger?: string): Promise<LauncherResponse<{ ok?: boolean; checkpoint?: SessionCheckpoint | null }>>;
+    listSessionCheckpoints(): Promise<LauncherResponse<{ checkpoints: SessionCheckpoint[] }>>;
+    listCodexSessions(): Promise<LauncherResponse<{ sessions: { sessionId: string; createdAt?: string | null }[] }>>;
+    probeCodexApi(cfg?: LauncherConfig): Promise<LauncherResponse<{ codexApiBaseUrl: string; healthOk: boolean; restSessionsSupported: boolean; appServerWebSocketUrl: string; notes: string[] }>>;
 }
 
 declare global {

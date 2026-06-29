@@ -1,5 +1,10 @@
 import type { CodexConfigInspection } from "./codexProfile";
-import type { LauncherConfig, CodexProcessInfo } from "../types";
+import type {
+  CodexProcessInfo,
+  FailoverStatus,
+  LauncherConfig,
+  SessionCheckpoint,
+} from "../types";
 
 export interface LauncherResponse<T> {
   ok: boolean;
@@ -61,6 +66,37 @@ export interface CodexRpcClient {
   saveSettings(settings: Record<string, unknown>): Promise<LauncherResponse<{ message?: string }>>;
   toggleAutoStart(): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
   setAutoStart(enabled: boolean): Promise<LauncherResponse<{ message?: string; enabled: boolean }>>;
+  getFailoverStatus(): Promise<LauncherResponse<FailoverStatus>>;
+  dismissFailoverAlert(): Promise<LauncherResponse<{ ok?: boolean }>>;
+  failoverToLocal(
+    profileName?: string,
+  ): Promise<
+    LauncherResponse<{
+      ok?: boolean;
+      message?: string;
+      profileName?: string;
+      resumePrompt?: string;
+      checkpoint?: SessionCheckpoint;
+    }>
+  >;
+  captureSessionCheckpoint(
+    trigger?: string,
+  ): Promise<LauncherResponse<{ ok?: boolean; checkpoint?: SessionCheckpoint | null }>>;
+  listSessionCheckpoints(): Promise<LauncherResponse<{ checkpoints: SessionCheckpoint[] }>>;
+  listCodexSessions(): Promise<
+    LauncherResponse<{ sessions: { sessionId: string; createdAt?: string | null }[] }>
+  >;
+  probeCodexApi(
+    cfg?: LauncherConfig,
+  ): Promise<
+    LauncherResponse<{
+      codexApiBaseUrl: string;
+      healthOk: boolean;
+      restSessionsSupported: boolean;
+      appServerWebSocketUrl: string;
+      notes: string[];
+    }>
+  >;
 }
 
 export function createCodexRpcClient(): CodexRpcClient {
@@ -103,6 +139,15 @@ export function createCodexRpcClient(): CodexRpcClient {
     saveSettings: (settings) => call("saveSettings", settings),
     toggleAutoStart: () => call("toggleAutoStart"),
     setAutoStart: (enabled) => call("setAutoStart", { enabled }),
+    getFailoverStatus: () => call("getFailoverStatus"),
+    dismissFailoverAlert: () => call("dismissFailoverAlert"),
+    failoverToLocal: (profileName) =>
+      call("failoverToLocal", profileName ? { profileName } : {}),
+    captureSessionCheckpoint: (trigger) =>
+      call("captureSessionCheckpoint", trigger ? { trigger } : {}),
+    listSessionCheckpoints: () => call("listSessionCheckpoints"),
+    listCodexSessions: () => call("listCodexSessions"),
+    probeCodexApi: (cfg) => call("probeCodexApi", (cfg ?? {}) as unknown as Record<string, unknown>),
   };
 }
 

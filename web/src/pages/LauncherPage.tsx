@@ -18,6 +18,7 @@ import { reconcileModelSelection } from "../lib/modelSelection";
 import { activeProviderMode, type ProviderMode } from "../lib/codexProfile";
 import { canStartCodex, localActivationRequirements } from "../lib/providerGuards";
 import { APP_NAME } from "../lib/branding";
+import { FailoverBanner } from "../components/launcher/FailoverBanner";
 
 export function LauncherPage() {
   const {
@@ -38,6 +39,10 @@ export function LauncherPage() {
     codexProfile,
     writingCodex,
     revertingCodex,
+    failoverStatus,
+    failoverToLocal,
+    dismissFailoverAlert,
+    copyResumePrompt,
   } = useLauncher();
 
   const [activeNav, setActiveNav] = useState<NavKey>("launcher");
@@ -154,6 +159,17 @@ export function LauncherPage() {
                   Configure Codex, pick a model provider, and run Codex from one place.
                 </p>
               </header>
+
+              {failoverStatus.activeAlert && !failoverStatus.activeAlert.dismissed ? (
+                <FailoverBanner
+                  alert={failoverStatus.activeAlert}
+                  checkpoint={failoverStatus.lastCheckpoint}
+                  busy={operation === "failover_switching"}
+                  onFailover={() => void failoverToLocal()}
+                  onDismiss={() => void dismissFailoverAlert()}
+                  onCopyResume={() => void copyResumePrompt()}
+                />
+              ) : null}
 
               <ProviderModeCard
                 profile={codexProfile}
