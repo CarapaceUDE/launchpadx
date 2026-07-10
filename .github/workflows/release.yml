@@ -325,7 +325,7 @@ jobs:
           $package = "$env:BINARY_NAME-$env:TAG-$env:TARGET"
           foreach ($file in @("$package/$env:BINARY_NAME.exe", "$package/$env:BINARY_NAME-cli.exe")) {
             $signature = Get-AuthenticodeSignature $file
-            if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature for $file: $($signature.Status)" }
+            if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature for ${file}: $($signature.Status)" }
           }
 
       - name: Repack signed Windows archive
