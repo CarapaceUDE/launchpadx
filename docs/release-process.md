@@ -1,74 +1,58 @@
 # Release Process
 
-## Model
+LaunchPadX uses one GitHub Actions workflow to build and publish native Windows, macOS, and Linux archives. A release stays in draft until all three builds succeed.
 
-| Channel | What ships | Who gets it |
-| ------- | ---------- | ----------- |
-| GitHub (`master`) | Source code (MIT) | Everyone |
-| GitHub Release (tag) | Source archive + release notes | Everyone |
-| Patreon | Official pre-built binaries | Supporters |
-| Build from source | Your own binary | Anyone with Rust/Node |
+## First-time repository settings
 
-Official binaries are **not** attached to public GitHub Releases. See [OFFICIAL_BUILDS.md](../OFFICIAL_BUILDS.md).
+1. Open **Settings → Actions → General** on GitHub.
+2. Under **Workflow permissions**, select **Read and write permissions**.
+3. Optionally protect `master` under **Settings → Branches** and require the `rust-checks` CI job.
 
-## Branching
+The workflow uses only GitHub's built-in `GITHUB_TOKEN`; no release secret is required.
 
-- `master` — always releasable
-- `feature/*`, `fix/*` — short-lived branches merged via PR
+## Ship a version
 
-## Day-to-day change flow
+1. Make sure CI is green on `master`.
+2. Update the versions in `Cargo.toml` and `web/package.json` and update `CHANGELOG.md`.
+3. Commit and push those changes.
+4. Create and push a matching version tag:
 
-1. Branch from `master`
-2. Implement + run the [testing checks](../README.md#testing) (and `cd web && npm run build` if UI changed)
-3. Open PR → wait for CI green → squash merge
-4. Update `CHANGELOG.md` for user-visible changes
+   ```sh
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
 
-## Shipping a version
+5. Open the repository's **Actions** tab and watch **Build and release**.
+6. Download each archive from the new GitHub Release and smoke-test it.
 
-### 1. Prepare `master`
+Pushing a `v*` tag automatically creates a draft release, builds all platforms, uploads their archives directly to that release, and publishes it only after all builds pass. Direct release uploads avoid GitHub Actions artifact-storage quotas.
 
-- Bump `version` in `Cargo.toml` and `web/package.json` if needed
-- Update `CHANGELOG.md`
-- Merge all pending PRs
+## Retry a failed release
 
-### 2. Tag the release
+Fix the problem on the tagged commit (or move the tag only if the release has not been announced), then open **Actions → Build and release → Run workflow** and enter the existing tag. Uploads use `--clobber`, so retrying safely replaces same-named assets.
 
-```powershell
-git checkout master
-git pull origin master
-git tag v0.1.0
-git push origin v0.1.0
+## Reuse in another Rust project
+
+Copy `.github/workflows/release.yml`. Its reusable interface accepts:
+
+- `tag`: an existing `v*` tag
+- `binary-name`: the Cargo binary name, defaulting to `launchpadx`
+
+Another workflow can call it like this:
+
+```yaml
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: your-owner/your-repo/.github/workflows/release.yml@master
+    with:
+      tag: ${{ github.ref_name }}
+      binary-name: your-app
 ```
 
-Pushing a `v*` tag triggers:
-
-- **Release** workflow — public GitHub Release (source only, no binaries)
-- **Build Official Binaries** workflow — private CI artifacts for Patreon upload
-
-### 3. Publish to Patreon
-
-1. Open **Actions** → **Build Official Binaries** → select the tag run
-2. Download each platform artifact
-3. Upload to your Patreon post / supporter download area
-4. Optionally note the version in your Patreon changelog
-
-### 4. Verify
-
-- GitHub **Releases** page shows the tag with release notes (no `.exe` attached)
-- You can install from a downloaded artifact before posting to Patreon
-- Update Patreon post with version + changelog link
-
-## GitHub settings (recommended)
-
-- Protect `master`: require PR + passing CI
-- Squash merge PRs
-- Do not attach binaries to public releases manually
+The copied project must use the same Rust-plus-`web/` layout. For a different frontend layout, edit the Node setup and **Build web UI** step.
 
 ## Versioning
 
-Use [SemVer](https://semver.org/):
-
-- `v0.1.x` — pre-1.0 development
-- Patch — bug fixes
-- Minor — new features
-- Major — breaking changes or 1.0 stability promise
+Use semantic versions: patch for fixes, minor for backwards-compatible features, and major for breaking changes or the 1.0 stability promise.

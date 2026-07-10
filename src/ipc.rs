@@ -1,14 +1,14 @@
 use crate::app_logic;
-#[allow(unused_imports)]
-use crate::codex_process::CodexProcess;
 use crate::config::LauncherConfig;
+#[allow(unused_imports)]
+use crate::lpad_process::CodexProcess;
 use std::path::PathBuf;
 
 /// Shared state passed through IPC.
 pub struct IpcState {
     pub config_path: PathBuf,
     pub root: PathBuf,
-    pub codex_process: Option<CodexProcess>,
+    pub lpad_process: Option<CodexProcess>,
 }
 
 /// An IPC request from the frontend.
@@ -72,7 +72,7 @@ fn do_launch(state: &IpcState) -> IpcResponse {
         return IpcResponse::err(format!("Failed to write Codex config: {e}"));
     }
 
-    let pid_file = app_logic::codex_pid_file(&state.config_path);
+    let pid_file = app_logic::lpad_pid_file(&state.config_path);
 
     match app_logic::launch(&config, &state.root, &pid_file) {
         Ok(msg) => IpcResponse::ok(serde_json::json!({ "message": msg })),
@@ -85,7 +85,7 @@ fn do_stop(state: &IpcState) -> IpcResponse {
         Ok(c) => c,
         Err(e) => return IpcResponse::err(format!("Cannot read config: {e}")),
     };
-    let pid_file = app_logic::codex_pid_file(&state.config_path);
+    let pid_file = app_logic::lpad_pid_file(&state.config_path);
     match app_logic::stop_codex(&config, &state.root, &pid_file) {
         Ok(msg) => IpcResponse::ok(serde_json::json!({ "message": msg })),
         Err(e) => IpcResponse::err(format!("Failed to stop: {e}")),

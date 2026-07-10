@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::config::LauncherConfig;
 
-const CACHE_DIR_NAME: &str = "codex-launchpad";
+const CACHE_DIR_NAME: &str = "launchpadx";
 const MODEL_CACHE_FILE_NAME: &str = "ollama-models.json";
 
 #[derive(Debug, Error)]
@@ -87,7 +87,7 @@ pub fn resolve_model(
     config: &LauncherConfig,
     base_url: &str,
 ) -> Result<Option<String>, OllamaError> {
-    if let Some(model) = config.codex_model() {
+    if let Some(model) = config.lpad_model() {
         return Ok(Some(model));
     }
 

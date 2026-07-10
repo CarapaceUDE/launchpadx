@@ -1,4 +1,4 @@
-import { Github, Globe, Heart, MessageCircle } from "lucide-react";
+import { Download, Github, Globe, MessageCircle } from "lucide-react";
 import { AppIcon } from "./AppIcon";
 import {
   APP_NAME,
@@ -9,6 +9,7 @@ import {
   ORG_PATREON,
   ORG_TAGLINE,
   ORG_WEBSITE,
+  RELEASES_URL,
   TRADEMARK_NOTICE,
 } from "../../lib/branding";
 
@@ -23,7 +24,7 @@ export function AboutPanel() {
         </div>
         <h3 className="text-[16px] font-semibold text-foreground">{APP_NAME}</h3>
         <p className="text-[12px] text-muted-foreground">{ORG_TAGLINE}</p>
-        <p className="text-[12px] text-muted-foreground">Version 0.1.0</p>
+        <p className="text-[12px] text-muted-foreground">Version 0.2.0</p>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -46,13 +47,13 @@ export function AboutPanel() {
           CarapaceAI
         </a>
         <a
-          href={ORG_PATREON}
+          href={RELEASES_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 rounded-lg border border-border p-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
         >
-          <Heart className="h-4 w-4" />
-          Official Builds (Patreon)
+          <Download className="h-4 w-4" />
+          Download Releases
         </a>
         <a
           href={ORG_DISCORD}
@@ -67,21 +68,20 @@ export function AboutPanel() {
 
       <div className="mt-4 border-t border-border pt-4 text-left">
         <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Early Access Builds
+          Open Source Releases
         </h4>
         <div className="space-y-2 text-[12px] leading-relaxed text-foreground/70">
           <p>
-            Official pre-compiled binaries are currently available to{" "}
+            Pre-compiled Windows, macOS, and Linux archives are available on{" "}
             <a
-              href={ORG_PATREON}
+              href={RELEASES_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline-offset-2 hover:underline"
             >
-              Patreon supporters
+              GitHub Releases
             </a>{" "}
-            as early access. We are working toward making binaries available
-            directly from us for everyone.
+            and are built automatically from each tagged source version.
           </p>
           <p>
             Patreon is primarily a way to support the project — you do not need

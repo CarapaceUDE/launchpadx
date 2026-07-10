@@ -1,11 +1,11 @@
-import { LauncherProvider } from "./context/LauncherContext";
+import { LaunchPadXProvider } from "./context/LaunchPadXContext";
 import { LauncherPage } from "./pages/LauncherPage";
 
 function App() {
   return (
-    <LauncherProvider>
+    <LaunchPadXProvider>
       <LauncherPage />
-    </LauncherProvider>
+    </LaunchPadXProvider>
   );
 }
 

@@ -2,15 +2,16 @@ import { useState } from "react";
 import { ChevronDown, Cloud, Eye, EyeOff, Server, Settings } from "lucide-react";
 import { Card, FormField, TextInput, ToggleRow } from "./primitives";
 import { ThemeToggle } from "./ThemeToggle";
-import type { CodexConfigForm } from "../../context/LauncherContext";
+import type { CodexConfigForm } from "../../context/LaunchPadXContext";
 import {
   providerModeDescription,
   providerModeLabel,
   type ProviderMode,
-} from "../../lib/codexProfile";
+} from "../../lib/lpadProfile";
 import type { CodexRateLimitsStatus } from "../../types";
-import { CodexRateLimitsPanel } from "./CodexRateLimitsPanel";
+import { LaunchPadXRateLimitsPanel } from "./LaunchPadXRateLimitsPanel";
 import { LocalModelsCatalog } from "./LocalModelsCatalog";
+import { APP_NAME, TARGET_APP_NAME } from "../../lib/branding";
 
 const PROVIDERS: ProviderMode[] = ["codex", "local"];
 
@@ -105,25 +106,25 @@ export function ProviderSettingsPanel({
       </Card>
 
       {provider === "codex" ? (
-        <Card icon={<Cloud className="h-4 w-4" />} title="Codex Account settings">
+        <Card icon={<Cloud className="h-4 w-4" />} title="Cloud Account settings">
           <div className="space-y-4">
             <ToggleRow
-              label="Auto-start Codex"
-              description="Start Codex when this app opens"
+              label={`Auto-start ${TARGET_APP_NAME}`}
+              description={`Start ${TARGET_APP_NAME} when ${APP_NAME} opens`}
               checked={autoStart}
               onChange={onAutoStartChange}
               testId="auto-start-toggle"
             />
             <ToggleRow
               label="Auto-switch to local on rate limit"
-              description="When Codex app-server reports rateLimitReachedType, stop Codex, apply your local API settings, and restart automatically"
+              description={`When the app-server reports rateLimitReachedType, stop ${TARGET_APP_NAME}, apply your local API settings, and restart automatically`}
               checked={autoSwitchOnRateLimit}
               onChange={onAutoSwitchOnRateLimitChange}
               testId="auto-switch-rate-limit-toggle"
             />
             <FormField
               label="Working Directory"
-              hint="Absolute path to the project directory Codex should use"
+              hint={`Absolute path to the project directory ${TARGET_APP_NAME} should use`}
             >
               <TextInput
                 data-testid="working-directory"
@@ -134,7 +135,7 @@ export function ProviderSettingsPanel({
             </FormField>
 
             <div className="border-t border-border pt-4">
-              <CodexRateLimitsPanel
+              <LaunchPadXRateLimitsPanel
                 status={rateLimitsStatus}
                 loading={rateLimitsLoading}
                 onRefresh={onRefreshRateLimits}
@@ -213,7 +214,7 @@ export function ProviderSettingsPanel({
         </Card>
       )}
 
-      <Card icon={<Settings className="h-4 w-4" />} title="Advanced Codex configuration">
+      <Card icon={<Settings className="h-4 w-4" />} title={`Advanced ${TARGET_APP_NAME} configuration`}>
         <button
           type="button"
           onClick={() => setAdvancedOpen((o) => !o)}
@@ -240,15 +241,15 @@ export function ProviderSettingsPanel({
                   onChange={(e) => onCodexConfigChange({ codexProviderName: e.target.value })}
                 />
               </FormField>
-              <FormField label="Codex Config Path">
+              <FormField label={`${TARGET_APP_NAME} config path`}>
                 <TextInput
                   value={codexConfig.codexConfigPath}
                   onChange={(e) => onCodexConfigChange({ codexConfigPath: e.target.value })}
                 />
               </FormField>
               <FormField
-                label="Codex command override"
-                hint="Leave blank for auto-discovery from running Codex and common install paths"
+                label={`${TARGET_APP_NAME} command override`}
+                hint={`Leave blank for auto-discovery from running ${TARGET_APP_NAME} and common install paths`}
               >
                 <TextInput
                   value={codexConfig.codexCommand}
@@ -257,7 +258,7 @@ export function ProviderSettingsPanel({
                 />
               </FormField>
             </div>
-            <FormField label="Codex Args (comma-separated)">
+            <FormField label={`${TARGET_APP_NAME} args (comma-separated)`}>
               <TextInput
                 value={codexConfig.codexArgs}
                 onChange={(e) => onCodexConfigChange({ codexArgs: e.target.value })}

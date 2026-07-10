@@ -1,4 +1,4 @@
-import type { CodexConfigInspection } from "./codexProfile";
+import type { CodexConfigInspection } from "./lpadProfile";
 import type {
   CodexProcessInfo,
   CodexRateLimitsStatus,

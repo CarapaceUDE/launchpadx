@@ -1,3 +1,5 @@
+import { TARGET_APP_NAME } from "./branding";
+
 export type LauncherOperation =
   | "idle"
   | "initializing"
@@ -52,15 +54,17 @@ export function healthStatusMessage(
   providerMode: "codex" | "local" = "local",
 ): string {
   if (running) {
-    return apiReady ? "Codex is running." : "Codex started — API is warming up...";
+    return apiReady
+      ? `${TARGET_APP_NAME} is running.`
+      : `${TARGET_APP_NAME} started — API is warming up...`;
   }
   if (providerMode === "codex") {
-    return "Codex is stopped.";
+    return `${TARGET_APP_NAME} is stopped.`;
   }
   if (endpointReady) {
-    return "Codex is stopped. Local API endpoint is reachable.";
+    return `${TARGET_APP_NAME} is stopped. Local API endpoint is reachable.`;
   }
-  return "Codex is stopped. Local API endpoint is not reachable — check IP/port.";
+  return `${TARGET_APP_NAME} is stopped. Local API endpoint is not reachable — check IP/port.`;
 }
 
 export function blocksLaunchToggle(op: LauncherOperation): boolean {

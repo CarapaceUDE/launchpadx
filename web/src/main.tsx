@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { installCodexRpcClient } from './lib/codexRpc';
+import { installCodexRpcClient } from './lib/lpadRpc';
 import './styles.css';
 
 installCodexRpcClient();

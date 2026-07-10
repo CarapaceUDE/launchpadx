@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LauncherConfig } from "../types";
 import {
-  useLauncher,
+  useLaunchPadX,
   configToCodexForm,
   type NavKey,
   type CodexConfigForm,
-} from "../context/LauncherContext";
+} from "../context/LaunchPadXContext";
 import { Sidebar } from "../components/launcher/Sidebar";
 import { ProviderModeCard } from "../components/launcher/ProviderModeCard";
 import { ProviderSettingsPanel } from "../components/launcher/ProviderSettingsPanel";
@@ -14,9 +14,9 @@ import { LogsPanel } from "../components/launcher/LogsPanel";
 import { AboutPanel } from "../components/launcher/AboutPanel";
 import { buildOpenAiBaseUrl } from "../lib/endpoint";
 import { reconcileModelSelection } from "../lib/modelSelection";
-import { activeProviderMode, type ProviderMode } from "../lib/codexProfile";
+import { activeProviderMode, type ProviderMode } from "../lib/lpadProfile";
 import { canStartCodex, localActivationRequirements } from "../lib/providerGuards";
-import { APP_NAME } from "../lib/branding";
+import { APP_NAME, TARGET_APP_NAME } from "../lib/branding";
 import { ConnectionBanner } from "../components/launcher/ConnectionBanner";
 import { FailoverBanner } from "../components/launcher/FailoverBanner";
 
@@ -49,7 +49,7 @@ export function LauncherPage() {
     refreshRateLimits,
     refreshFailoverStatus,
     captureCheckpoint,
-  } = useLauncher();
+  } = useLaunchPadX();
 
   const [activeNav, setActiveNav] = useState<NavKey>("launcher");
   const [settingsProvider, setSettingsProvider] = useState<ProviderMode>("local");
@@ -162,7 +162,7 @@ export function LauncherPage() {
               <header className="mb-1" data-testid="page-launcher">
                 <h1 className="text-[22px] font-semibold tracking-tight text-foreground">{APP_NAME}</h1>
                 <p className="text-[13px] text-muted-foreground">
-                  Configure Codex, pick a model provider, and run Codex from one place.
+                  Configure providers and launch {TARGET_APP_NAME} from one place.
                 </p>
               </header>
 

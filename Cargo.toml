@@ -1,7 +1,7 @@
 [package]
-name = "codex-launchpad"
-version = "0.1.0"
-repository = "https://github.com/CarapaceUDE/codex-launchpad"
+name = "launchpadx"
+version = "0.2.0"
+repository = "https://github.com/CarapaceUDE/launchpadx"
 edition = "2021"
 description = "Desktop launcher to point Codex at any OpenAI-compatible API."
 license = "MIT"

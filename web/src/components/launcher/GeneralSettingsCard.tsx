@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { SlidersHorizontal, Eye, EyeOff, Settings, ChevronDown } from "lucide-react";
 import { Card, FormField, TextInput, ToggleRow } from "./primitives";
-import type { CodexConfigForm } from "../../context/LauncherContext";
-import { APP_NAME } from "../../lib/branding";
+import type { CodexConfigForm } from "../../context/LaunchPadXContext";
+import { APP_NAME, TARGET_APP_NAME } from "../../lib/branding";
 
 export function GeneralSettingsCard({
   autoStart,
@@ -35,7 +35,7 @@ export function GeneralSettingsCard({
     <Card icon={<SlidersHorizontal className="h-4 w-4" />} title="General Settings">
       <div className="space-y-4">
         <ToggleRow
-          label="Auto-start Codex"
+          label={`Auto-start ${TARGET_APP_NAME}`}
           description="Launch the server when this app opens"
           checked={autoStart}
           onChange={onAutoStartChange}
@@ -85,7 +85,7 @@ export function GeneralSettingsCard({
           >
             <span className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-muted-foreground/60" />
-              Advanced Codex Configuration
+              Advanced {TARGET_APP_NAME} configuration
             </span>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground/60 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
@@ -99,31 +99,31 @@ export function GeneralSettingsCard({
                   <TextInput
                     value={codexConfig.codexProviderId}
                     onChange={(e) => onCodexConfigChange({ codexProviderId: e.target.value })}
-                    placeholder="codex-launchpad"
+                    placeholder="launchpadx"
                   />
                 </FormField>
                 <FormField label="Provider Name">
                   <TextInput
                     value={codexConfig.codexProviderName}
                     onChange={(e) => onCodexConfigChange({ codexProviderName: e.target.value })}
-                    placeholder="Codex Launchpad"
+                    placeholder="LaunchPadX"
                   />
                 </FormField>
-                <FormField label="Codex Config Path">
+                <FormField label={`${TARGET_APP_NAME} config path`}>
                   <TextInput
                     value={codexConfig.codexConfigPath}
                     onChange={(e) => onCodexConfigChange({ codexConfigPath: e.target.value })}
                     placeholder="/path/to/config"
                   />
                 </FormField>
-                <FormField label="Codex Command">
+                <FormField label={`${TARGET_APP_NAME} command`}>
                   <TextInput
                     value={codexConfig.codexCommand}
                     onChange={(e) => onCodexConfigChange({ codexCommand: e.target.value })}
                     placeholder="codex-app"
                   />
                 </FormField>
-                <FormField label="Codex API Port">
+                <FormField label={`${TARGET_APP_NAME} API port`}>
                   <TextInput
                     type="number"
                     value={codexConfig.codexApiPort}
@@ -131,7 +131,7 @@ export function GeneralSettingsCard({
                     placeholder="4000"
                   />
                 </FormField>
-                <FormField label="Codex API Scheme">
+                <FormField label={`${TARGET_APP_NAME} API scheme`}>
                   <select
                     value={codexConfig.codexApiScheme}
                     onChange={(e) => onCodexConfigChange({ codexApiScheme: e.target.value })}
@@ -142,7 +142,7 @@ export function GeneralSettingsCard({
                   </select>
                 </FormField>
               </div>
-              <FormField label="Codex Args (comma-separated)">
+              <FormField label={`${TARGET_APP_NAME} args (comma-separated)`}>
                 <TextInput
                   value={codexConfig.codexArgs}
                   onChange={(e) => onCodexConfigChange({ codexArgs: e.target.value })}

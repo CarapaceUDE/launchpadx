@@ -12,13 +12,14 @@ import {
   providerModeLabel,
   type CodexProfileState,
   type ProviderMode,
-} from "../../lib/codexProfile";
+} from "../../lib/lpadProfile";
 import {
   blocksProviderSwitch,
   codexAccountSwitchWarnings,
 } from "../../lib/providerGuards";
 import type { CodexRateLimitsStatus } from "../../types";
-import { CodexRateLimitsCompact } from "./CodexRateLimitsPanel";
+import { LaunchPadXRateLimitsCompact } from "./LaunchPadXRateLimitsPanel";
+import { APP_NAME, TARGET_APP_NAME } from "../../lib/branding";
 
 function ProviderSegment({
   mode,
@@ -187,8 +188,8 @@ export function ProviderModeCard({
     : isLaunching
       ? "Starting..."
       : running
-        ? "Stop Codex"
-        : "Start Codex";
+        ? `Stop ${TARGET_APP_NAME}`
+        : `Start ${TARGET_APP_NAME}`;
 
   const handleSelect = (mode: ProviderMode) => {
     if (switching || switchBlocked) return;
@@ -218,9 +219,9 @@ export function ProviderModeCard({
       <Card className="!p-4 sm:!p-5" data-testid="provider-mode-card">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
-            <h2 className="text-[16px] font-semibold tracking-tight text-foreground">Codex</h2>
+            <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{APP_NAME}</h2>
             <p className="mt-1 text-[13px] text-muted-foreground">
-              Choose a model provider, then start Codex when you are ready.
+              Choose a model provider, then start {TARGET_APP_NAME} when you are ready.
             </p>
           </div>
 
@@ -238,7 +239,7 @@ export function ProviderModeCard({
               onClick={onToggleLaunch}
               disabled={launchBusy || (!running && !canStart)}
               aria-busy={launchBusy}
-              title={running ? "Stop Codex" : "Start Codex"}
+              title={running ? `Stop ${TARGET_APP_NAME}` : `Start ${TARGET_APP_NAME}`}
               className={[
                 "inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-md px-3.5 text-[13px] font-semibold transition-colors sm:w-auto",
                 running && !launchBusy
@@ -262,7 +263,7 @@ export function ProviderModeCard({
 
         <div
           role="tablist"
-          aria-label="Codex model provider"
+          aria-label="Model provider"
           className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-muted/40 p-1 xl:grid-cols-2 xl:gap-1"
         >
           <ProviderSegment
@@ -274,7 +275,7 @@ export function ProviderModeCard({
             onSelect={() => handleSelect("codex")}
             onOpenSettings={() => onOpenProviderSettings("codex")}
           >
-            <CodexRateLimitsCompact status={rateLimitsStatus} loading={rateLimitsLoading} />
+            <LaunchPadXRateLimitsCompact status={rateLimitsStatus} loading={rateLimitsLoading} />
           </ProviderSegment>
 
           <ProviderSegment
@@ -349,14 +350,14 @@ export function ProviderModeCard({
             aria-describedby="provider-confirm-description"
           >
             <h3 id="provider-confirm-title" className="text-[16px] font-semibold text-foreground">
-              Switch to Codex Account?
+              Switch to Cloud Account?
             </h3>
             <p
               id="provider-confirm-description"
               className="mt-2 text-[13px] leading-relaxed text-muted-foreground"
             >
-              Codex will use your account sign-in again. Local API settings are removed from your
-              Codex config, and your previous profile is restored when available.
+              {TARGET_APP_NAME} will use your account sign-in again. Local API settings are removed
+              from your profile, and your previous settings are restored when available.
             </p>
             {codexSwitchWarnings.length > 0 ? (
               <ul className="mt-3 space-y-1.5 text-[12px] leading-relaxed text-warning-fg">

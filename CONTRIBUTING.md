@@ -1,8 +1,8 @@
-# Contributing to Codex Launchpad
+# Contributing to LaunchPadX
 
 Thanks for your interest in contributing! This project is a small Rust tool, and contributions are welcome.
 
-**Source code** is MIT-licensed and open to everyone. **Official pre-built binaries** are distributed separately to Patreon supporters — see [OFFICIAL_BUILDS.md](OFFICIAL_BUILDS.md) and [docs/release-process.md](docs/release-process.md).
+Source code and release binaries are MIT-licensed and available to everyone. See the [release process](docs/release-process.md).
 
 ## Getting Started
 
@@ -21,14 +21,14 @@ cargo build --bins
 
 Or use `./build.sh` on macOS/Linux/Git Bash. `cargo build` alone also works — `build.rs` installs web deps and builds the UI when needed.
 
-`build.cmd`, `build-check.ps1`, `run-gui.cmd`, and other `.ps1`/`.cmd` files are **Windows-only shortcuts**. The portable interface is `cargo`, `npm`, and `codex-launchpad` CLI flags such as `--diagnose` and `--build-check`.
+`build.cmd`, `build-check.ps1`, `run-gui.cmd`, and other `.ps1`/`.cmd` files are **Windows-only shortcuts**. The portable interface is `cargo`, `npm`, and `launchpadx` CLI flags such as `--diagnose` and `--build-check`.
 
 ### Running
 
 | Command | Purpose |
 |---|---|
-| `codex-launchpad --gui` | Launch the desktop UI |
-| `codex-launchpad --launch` | Write config and launch Codex |
+| `launchpadx --gui` | Launch the desktop UI |
+| `launchpadx --launch` | Write config and launch Codex |
 | `cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings` | Pre-commit checks |
 | `cd web && npm run screenshot:readme` | Regenerate `assets/readme-screenshot.png` for the README |
 
@@ -37,12 +37,12 @@ On Windows you can use `.\run-gui.cmd`, `.\test.cmd`, and the scripts in `script
 ### CLI Options
 
 ```
-codex-launchpad --config <path>
-codex-launchpad --write-config-only
-codex-launchpad --refresh-models
-codex-launchpad --list-models
-codex-launchpad --restore
-codex-launchpad --diagnose
+launchpadx --config <path>
+launchpadx --write-config-only
+launchpadx --refresh-models
+launchpadx --list-models
+launchpadx --restore
+launchpadx --diagnose
 ```
 
 ## How to Contribute
@@ -86,4 +86,4 @@ Please include:
 - OS and version
 - Launcher version (check `cargo pkgid`)
 - Steps to reproduce
-- Relevant log output (`~/.codex-launchpad/error.log` or `codex-launchpad-gui.error.log`)
+- Relevant log output (`~/.launchpadx/error.log` or `launchpadx-gui.error.log`)

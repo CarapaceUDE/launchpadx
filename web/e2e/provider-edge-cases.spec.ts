@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const codexFixture = path.join(__dirname, "fixtures", "codex-config.toml");
-const backupDir = path.join(__dirname, "fixtures", "backups", "codex-launchpad");
+const backupDir = path.join(__dirname, "fixtures", "backups", "launchpadx");
 const seedToml = `model = "gpt-test"
 model_provider = "openai"
 
@@ -65,7 +65,7 @@ test.describe("Provider edge cases", () => {
     await page.getByTestId("provider-activate-codex").click();
     await expect(page.getByTestId("provider-confirm-dialog")).toBeVisible();
     await expect(page.getByTestId("provider-confirm-dialog")).toContainText(
-      /restore snapshot|switch Codex back to your account provider/i,
+      /restore snapshot|switch back to your cloud account/i,
     );
   });
 });

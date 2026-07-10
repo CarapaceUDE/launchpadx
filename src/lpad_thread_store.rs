@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::codex_app_server::CodexThreadSummary;
+use crate::lpad_app_server::CodexThreadSummary;
 
 #[derive(Debug, Deserialize)]
 struct SessionIndexRow {
@@ -23,10 +23,7 @@ pub fn list_threads_from_store(limit: usize) -> Result<Vec<CodexThreadSummary>, 
     let home = codex_home().ok_or_else(|| "could not resolve Codex home directory".to_string())?;
     let index_path = home.join("session_index.jsonl");
     if !index_path.is_file() {
-        return Err(format!(
-            "no session index at {}",
-            index_path.display()
-        ));
+        return Err(format!("no session index at {}", index_path.display()));
     }
 
     let mut rows = read_session_index(&index_path)?;

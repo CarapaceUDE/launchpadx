@@ -20,7 +20,7 @@ use toml_edit::{value, DocumentMut, Item, Table};
 use crate::config::{ApiKeyMode, LauncherConfig};
 
 const ENV_KEY_NAME: &str = "OPENAI_API_KEY";
-const BACKUP_DIR_NAME: &str = "codex-launchpad";
+const BACKUP_DIR_NAME: &str = "launchpadx";
 
 #[derive(Debug, Error)]
 pub enum CodexConfigError {
@@ -85,11 +85,11 @@ impl PersistentCodexConfig {
                 .map(Ok)
                 .unwrap_or_else(default_codex_config_path)?,
             model,
-            provider_id: config.codex_provider_id(),
-            provider_name: config.codex_provider_name(),
+            provider_id: config.lpad_provider_id(),
+            provider_name: config.lpad_provider_name(),
             base_url,
             api_key,
-            api_key_mode: config.codex_api_key_mode(),
+            api_key_mode: config.lpad_api_key_mode(),
         })
     }
 }
@@ -110,7 +110,7 @@ pub fn inspect(config: &LauncherConfig) -> Result<CodexConfigInspection, CodexCo
         .codex_config_path()
         .map(Ok)
         .unwrap_or_else(default_codex_config_path)?;
-    let provider_id = config.codex_provider_id();
+    let provider_id = config.lpad_provider_id();
     let exists = config_path.exists();
     let restore_state_available = restore_state_path(&config_path).exists();
 
@@ -157,7 +157,7 @@ pub fn restore(config: &LauncherConfig) -> Result<(PathBuf, Option<String>), Cod
         .codex_config_path()
         .map(Ok)
         .unwrap_or_else(default_codex_config_path)?;
-    let provider_id = config.codex_provider_id();
+    let provider_id = config.lpad_provider_id();
     let mut document = read_document(&config_path)?;
     let restore_state = read_restore_state(&config_path)?;
 
@@ -440,7 +440,7 @@ fn restore_root_string(
 fn is_known_launcher_provider_id(id: &str) -> bool {
     matches!(
         id,
-        "codex-launchpad" | "codex-local-launcher" | "codex_launchpad"
+        "launchpadx" | "codex-local-launcher" | "codex_launchpad" | "codex-launchpad"
     )
 }
 
@@ -462,9 +462,7 @@ fn provider_has_launcher_fingerprint(document: &DocumentMut, provider_id: &str) 
         .and_then(Item::as_str)
         .is_some_and(|key| key == ENV_KEY_NAME);
 
-    wire_api == Some("responses")
-        && requires_auth == Some(false)
-        && (has_bearer || has_env_key)
+    wire_api == Some("responses") && requires_auth == Some(false) && (has_bearer || has_env_key)
 }
 
 fn is_launcher_managed_provider(
@@ -595,7 +593,7 @@ mod tests {
         PersistentCodexConfig {
             config_path: path,
             model: Some("llama3.2".to_string()),
-            provider_id: "codex-launchpad".to_string(),
+            provider_id: "launchpadx".to_string(),
             provider_name: "Local Ollama".to_string(),
             base_url: "http://127.0.0.1:11434/v1".to_string(),
             api_key: "test-key".to_string(),
@@ -620,8 +618,8 @@ conversationDetailMode = "STEPS_COMMANDS"
         assert!(text.contains(r#"approval_policy = "never""#));
         assert!(text.contains("[desktop]"));
         assert!(text.contains(r#"model = "llama3.2""#));
-        assert!(text.contains(r#"model_provider = "codex-launchpad""#));
-        assert!(text.contains("[model_providers.codex-launchpad]"));
+        assert!(text.contains(r#"model_provider = "launchpadx""#));
+        assert!(text.contains("[model_providers.launchpadx]"));
         assert!(text.contains(r#"base_url = "http://127.0.0.1:11434/v1""#));
         assert!(text.contains(r#"experimental_bearer_token = "test-key""#));
     }
@@ -629,7 +627,7 @@ conversationDetailMode = "STEPS_COMMANDS"
     #[test]
     fn env_key_mode_removes_persisted_bearer_token() {
         let mut document = r#"
-[model_providers.codex-launchpad]
+[model_providers.launchpadx]
 experimental_bearer_token = "old"
 "#
         .parse::<DocumentMut>()
@@ -685,11 +683,9 @@ name = "Local Ollama"
         assert!(!text.contains("model_provider"));
         assert!(!text.contains("codex-launchpad"));
     }
-
     #[test]
     fn apply_and_restore_round_trip() {
-        let dir =
-            std::env::temp_dir().join(format!("codex-launcher-roundtrip-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("launchpadx-roundtrip-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let path = dir.join("config.toml");
@@ -704,9 +700,9 @@ model_provider = "openai"
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
-            codex_provider_name: Some("Codex Launchpad".to_string()),
-            codex_model: Some("llama3.2".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
+            lpad_provider_name: Some("LaunchPadX".to_string()),
+            lpad_model: Some("llama3.2".to_string()),
             api_key: Some("test-key".to_string()),
             ..LauncherConfig::default()
         };
@@ -714,8 +710,8 @@ model_provider = "openai"
         let settings = PersistentCodexConfig {
             config_path: path.clone(),
             model: Some("llama3.2".to_string()),
-            provider_id: "codex-launchpad".to_string(),
-            provider_name: "Codex Launchpad".to_string(),
+            provider_id: "launchpadx".to_string(),
+            provider_name: "LaunchPadX".to_string(),
             base_url: "http://127.0.0.1:11434/v1".to_string(),
             api_key: "test-key".to_string(),
             api_key_mode: ApiKeyMode::ExperimentalBearerToken,
@@ -743,19 +739,19 @@ model_provider = "openai"
 
     #[test]
     fn inspect_detects_managed_provider() {
-        let path = std::env::temp_dir().join("codex-launcher-inspect-test.toml");
+        let path = std::env::temp_dir().join("launchpadx-inspect-test.toml");
         let text = r#"
 model = "llama3.2"
-model_provider = "codex-launchpad"
+model_provider = "launchpadx"
 
-[model_providers.codex-launchpad]
+[model_providers.launchpadx]
 base_url = "http://127.0.0.1:11434/v1"
 "#;
         std::fs::write(&path, text).expect("write temp config");
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
             ..LauncherConfig::default()
         };
 
@@ -773,10 +769,8 @@ base_url = "http://127.0.0.1:11434/v1"
 
     #[test]
     fn restore_handles_legacy_provider_id_mismatch() {
-        let dir = std::env::temp_dir().join(format!(
-            "codex-launcher-legacy-restore-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("launchpadx-legacy-restore-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let path = dir.join("config.toml");
@@ -787,7 +781,7 @@ model = "qwen3.635b-a3b-coding-mxfp8"
 model_provider = "codex-local-launcher"
 
 [model_providers.codex-local-launcher]
-name = "codex-local-launcher"
+model_provider = "codex-local-launcher"
 base_url = "http://127.0.0.1:11434/v1"
 wire_api = "responses"
 requires_openai_auth = false
@@ -816,7 +810,7 @@ experimental_bearer_token = "test-key"
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
             ..LauncherConfig::default()
         };
 
@@ -845,7 +839,7 @@ experimental_bearer_token = "test-key"
     #[test]
     fn restore_does_not_change_root_values_when_not_active_provider() {
         let dir = std::env::temp_dir().join(format!(
-            "codex-launcher-inactive-restore-{}",
+            "launchpadx-inactive-restore-{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&dir);
@@ -861,7 +855,7 @@ model_provider = "openai"
 name = "OpenAI"
 base_url = "https://api.openai.com/v1"
 
-[model_providers.codex-launchpad]
+[model_providers.launchpadx]
 name = "Local Ollama"
 base_url = "http://127.0.0.1:11434/v1"
 wire_api = "responses"
@@ -873,7 +867,7 @@ experimental_bearer_token = "test-key"
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
             ..LauncherConfig::default()
         };
 
@@ -892,10 +886,8 @@ experimental_bearer_token = "test-key"
 
     #[test]
     fn restore_without_snapshot_infers_account_provider_from_config() {
-        let dir = std::env::temp_dir().join(format!(
-            "codex-launcher-infer-restore-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("launchpadx-infer-restore-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let path = dir.join("config.toml");
@@ -903,7 +895,7 @@ experimental_bearer_token = "test-key"
             &path,
             r#"
 model = "qwen3.635b-a3b-coding-mxfp8"
-model_provider = "codex-local-launcher"
+model_provider = "launchpadx"
 
 [model_providers.openai]
 name = "OpenAI"
@@ -922,7 +914,7 @@ experimental_bearer_token = "test-key"
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
             ..LauncherConfig::default()
         };
 
@@ -944,10 +936,8 @@ experimental_bearer_token = "test-key"
 
     #[test]
     fn restore_fixes_orphan_launcher_model_provider_without_provider_block() {
-        let dir = std::env::temp_dir().join(format!(
-            "codex-launcher-orphan-root-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("launchpadx-orphan-root-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let path = dir.join("config.toml");
@@ -955,7 +945,7 @@ experimental_bearer_token = "test-key"
             &path,
             r#"
 model = "qwen3.635b-a3b-coding-mxfp8"
-model_provider = "codex-local-launcher"
+model_provider = "launchpadx"
 
 [model_providers.openai]
 name = "OpenAI"
@@ -967,7 +957,7 @@ requires_openai_auth = true
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
             ..LauncherConfig::default()
         };
 
@@ -988,10 +978,8 @@ requires_openai_auth = true
 
     #[test]
     fn restore_without_snapshot_falls_back_to_account_sign_in() {
-        let dir = std::env::temp_dir().join(format!(
-            "codex-launcher-signin-restore-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("launchpadx-signin-restore-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let path = dir.join("config.toml");
@@ -999,9 +987,9 @@ requires_openai_auth = true
             &path,
             r#"
 model = "llama3.2"
-model_provider = "codex-launchpad"
+model_provider = "launchpadx"
 
-[model_providers.codex-launchpad]
+[model_providers.launchpadx]
 name = "Local Ollama"
 base_url = "http://127.0.0.1:11434/v1"
 wire_api = "responses"
@@ -1013,7 +1001,7 @@ experimental_bearer_token = "test-key"
 
         let launcher = LauncherConfig {
             codex_config_path: Some(path.to_string_lossy().to_string()),
-            codex_provider_id: Some("codex-launchpad".to_string()),
+            lpad_provider_id: Some("launchpadx".to_string()),
             ..LauncherConfig::default()
         };
 

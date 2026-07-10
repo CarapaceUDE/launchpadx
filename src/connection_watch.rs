@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use crate::config::LauncherConfig;
 use crate::ollama;
 
-const DISCOVERY_DIR: &str = ".codex-launchpad/discovery";
+const DISCOVERY_DIR: &str = ".launchpadx/discovery";
 const DISCOVERY_FILE: &str = "connection.jsonl";
 const APP_LOG_PREFIX: &str = "CONNECTION_WATCH";
 
@@ -359,7 +359,10 @@ mod tests {
     fn matches_connection_errors() {
         let patterns = default_connection_failure_patterns();
         assert_eq!(
-            matches_connection_failure("dial tcp 127.0.0.1:11434: connect: connection refused", &patterns),
+            matches_connection_failure(
+                "dial tcp 127.0.0.1:11434: connect: connection refused",
+                &patterns
+            ),
             Some("connection refused".to_string())
         );
         assert!(matches_connection_failure("patch applied cleanly", &patterns).is_none());

@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::acp_client::AcpClient;
-use crate::codex_thread_store;
 use crate::config::LauncherConfig;
+use crate::lpad_thread_store;
 
 const MAX_SESSION_PREVIEWS: usize = 12;
 const PREVIEW_CHARS: usize = 480;
@@ -89,7 +89,7 @@ pub fn list_sessions_with_previews(config: &LauncherConfig) -> CodexSessionListD
 }
 
 fn list_sessions_from_store() -> CodexSessionListDetail {
-    match codex_thread_store::list_session_ids_from_store(MAX_SESSION_PREVIEWS) {
+    match lpad_thread_store::list_session_ids_from_store(MAX_SESSION_PREVIEWS) {
         Ok(rows) => CodexSessionListDetail {
             sessions: rows
                 .into_iter()

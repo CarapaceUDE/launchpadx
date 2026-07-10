@@ -147,10 +147,7 @@ pub fn discover_spawnable_codex_bins() -> Vec<PathBuf> {
     let packages = local.join("Packages");
     if let Ok(entries) = std::fs::read_dir(&packages) {
         for entry in entries.flatten() {
-            let name = entry
-                .file_name()
-                .to_string_lossy()
-                .to_ascii_lowercase();
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
             if !name.starts_with("openai.codex_") {
                 continue;
             }

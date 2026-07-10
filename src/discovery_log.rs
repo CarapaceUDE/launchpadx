@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn tails_and_sorts_discovery_entries() {
-        let dir = std::env::temp_dir().join(format!("codex-launchpad-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("launchpadx-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("tmpdir");
 

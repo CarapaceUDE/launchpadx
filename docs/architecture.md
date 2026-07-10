@@ -1,6 +1,6 @@
 # Architecture
 
-`codex-launchpad` has two layers:
+`launchpadx` has two layers:
 
 - `src/config.rs` reads the local JSON config and normalizes the OpenAI-compatible endpoint.
 - `src/codex_config.rs` updates `~/.codex/config.toml` for persistent provider settings and creates backups before writing.

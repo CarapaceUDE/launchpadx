@@ -24,7 +24,7 @@ pub fn run(config_path: &Path, project_root: &Path) -> Result<(), Box<dyn std::e
     let working_directory = config.working_directory(project_root)?;
     let api_key = config.api_key_if_configured();
 
-    println!("=== Codex Launchpad Diagnostic ===");
+    println!("=== LaunchPadX Diagnostic ===");
     print_section("Configuration");
     println!("Config path       : {}", config_path.display());
     println!("Endpoint          : {base_url}");
@@ -132,9 +132,9 @@ fn codex_launch_probe(config: &LauncherConfig) -> String {
 
 fn find_launcher_binary(project_root: &Path) -> Option<PathBuf> {
     let binary_name = if cfg!(windows) {
-        "codex-launchpad.exe"
+        "launchpadx.exe"
     } else {
-        "codex-launchpad"
+        "launchpadx"
     };
 
     let candidates = [

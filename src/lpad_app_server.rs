@@ -7,9 +7,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::codex_thread_store;
 use crate::config::LauncherConfig;
 use crate::launcher;
+use crate::lpad_thread_store;
 
 const INIT_REQUEST_ID: i64 = 0;
 const HANDSHAKE_DELAY_MS: u64 = 500;
@@ -109,7 +109,7 @@ pub fn list_threads(config: &LauncherConfig) -> CodexThreadListStatus {
         };
     }
 
-    if let Ok(threads) = codex_thread_store::list_threads_from_store(THREAD_LIST_LIMIT as usize) {
+    if let Ok(threads) = lpad_thread_store::list_threads_from_store(THREAD_LIST_LIMIT as usize) {
         if !threads.is_empty() {
             return CodexThreadListStatus {
                 ok: true,
@@ -128,9 +128,7 @@ pub fn list_threads(config: &LauncherConfig) -> CodexThreadListStatus {
         fetched_at,
         source: "codex app-server thread/list".to_string(),
         codex_cli: cli_candidates.first().cloned(),
-        error: Some(
-            "Could not reach Codex app-server or read local session index.".to_string(),
-        ),
+        error: Some("Could not reach Codex app-server or read local session index.".to_string()),
         threads: Vec::new(),
     }
 }
@@ -207,8 +205,8 @@ impl AppServerClient {
             "id": INIT_REQUEST_ID,
             "params": {
                 "clientInfo": {
-                    "name": "codex_launchpad",
-                    "title": "Codex Launchpad",
+                    "name": "launchpadx",
+                    "title": "LaunchPadX",
                     "version": "0.1.0"
                 }
             }
@@ -280,7 +278,10 @@ fn list_threads_via_cli(cli: &str) -> Result<CodexThreadListStatus, AppServerErr
     parse_thread_list_result(result, cli)
 }
 
-fn parse_thread_list_result(result: Value, cli: &str) -> Result<CodexThreadListStatus, AppServerError> {
+fn parse_thread_list_result(
+    result: Value,
+    cli: &str,
+) -> Result<CodexThreadListStatus, AppServerError> {
     let threads = extract_thread_rows(&result);
     Ok(CodexThreadListStatus {
         ok: true,
@@ -298,16 +299,10 @@ fn extract_thread_rows(result: &Value) -> Vec<CodexThreadSummary> {
         .or_else(|| result.get("threads"))
         .and_then(|value| value.as_array())
         .cloned()
-        .or_else(|| {
-            result
-                .get("thread")
-                .map(|thread| vec![thread.clone()])
-        })
+        .or_else(|| result.get("thread").map(|thread| vec![thread.clone()]))
         .unwrap_or_default();
 
-    rows.into_iter()
-        .filter_map(parse_thread_summary)
-        .collect()
+    rows.into_iter().filter_map(parse_thread_summary).collect()
 }
 
 fn parse_thread_summary(value: Value) -> Option<CodexThreadSummary> {
@@ -333,7 +328,11 @@ fn parse_thread_summary(value: Value) -> Option<CodexThreadSummary> {
         created_at: value
             .get("createdAt")
             .or_else(|| value.get("created_at"))
-            .and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_i64().map(|n| n.to_string()))),
+            .and_then(|v| {
+                v.as_str()
+                    .map(str::to_string)
+                    .or_else(|| v.as_i64().map(|n| n.to_string()))
+            }),
         model: value
             .get("model")
             .or_else(|| value.pointer("/settings/model"))
@@ -370,9 +369,12 @@ fn parse_rate_limits_result(
     })
 }
 
-fn write_request(stdin: &mut std::process::ChildStdin, payload: &Value) -> Result<(), AppServerError> {
-    let line = serde_json::to_string(payload)
-        .map_err(|error| AppServerError::Parse(error.to_string()))?;
+fn write_request(
+    stdin: &mut std::process::ChildStdin,
+    payload: &Value,
+) -> Result<(), AppServerError> {
+    let line =
+        serde_json::to_string(payload).map_err(|error| AppServerError::Parse(error.to_string()))?;
     stdin
         .write_all(line.as_bytes())
         .and_then(|_| stdin.write_all(b"\n"))
@@ -405,8 +407,8 @@ fn read_response_for_id(
             continue;
         }
 
-        let value: Value =
-            serde_json::from_str(trimmed).map_err(|error| AppServerError::Parse(error.to_string()))?;
+        let value: Value = serde_json::from_str(trimmed)
+            .map_err(|error| AppServerError::Parse(error.to_string()))?;
 
         if value.get("id").and_then(|id| id.as_i64()) == Some(request_id) {
             return Ok(value);
@@ -535,7 +537,11 @@ mod tests {
         let config = LauncherConfig::default();
         let status = list_threads(&config);
         if status.ok {
-            assert!(!status.threads.is_empty(), "expected threads from {:?}", status.source);
+            assert!(
+                !status.threads.is_empty(),
+                "expected threads from {:?}",
+                status.source
+            );
             return;
         }
         assert!(

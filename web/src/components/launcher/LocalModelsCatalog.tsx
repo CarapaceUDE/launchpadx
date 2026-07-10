@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
-import { useLauncher } from "../../context/LauncherContext";
+import { useLaunchPadX } from "../../context/LaunchPadXContext";
+import { APP_NAME } from "../../lib/branding";
 
 export function LocalModelsCatalog({
   modelCount,
@@ -8,7 +9,7 @@ export function LocalModelsCatalog({
   modelCount: number;
   onRefresh: () => void;
 }) {
-  const { models, config, refreshing } = useLauncher();
+  const { models, config, refreshing } = useLaunchPadX();
   const selected = config.codexModel ?? "";
 
   return (
@@ -17,7 +18,7 @@ export function LocalModelsCatalog({
         <div>
           <p className="text-[13px] font-medium text-foreground">Available models ({modelCount})</p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Browse models cached from your endpoint. Select the active model on the Launchpad provider
+            Browse models cached from your endpoint. Select the active model on the {APP_NAME} home
             card.
           </p>
         </div>
@@ -55,7 +56,7 @@ export function LocalModelsCatalog({
                 <span className="truncate font-medium">{model.name}</span>
                 {isSelected ? (
                   <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                    Launchpad
+                    {APP_NAME}
                   </span>
                 ) : null}
                 {model.size > 0 ? (

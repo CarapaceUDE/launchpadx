@@ -22,6 +22,7 @@ import type {
   SessionCheckpoint,
 } from "../../types";
 import type { ServerPillState } from "./primitives";
+import { TARGET_APP_NAME } from "../../lib/branding";
 
 const POLL_MS = 10_000;
 const DISCOVERY_POLL_MS = 30_000;
@@ -283,7 +284,7 @@ export function SessionMonitoringPanel({
       <Card icon={<Activity className="h-4 w-4" />} title="Watch status">
         <dl className="grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
           <div>
-            <dt className="text-muted-foreground">Codex process</dt>
+            <dt className="text-muted-foreground">{TARGET_APP_NAME} process</dt>
             <dd className="mt-0.5 font-medium text-foreground capitalize">{serverState}</dd>
           </div>
           <div>
@@ -311,7 +312,7 @@ export function SessionMonitoringPanel({
               <WifiOff className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
             )}
             <div>
-              <dt className="text-muted-foreground">Codex API</dt>
+              <dt className="text-muted-foreground">{TARGET_APP_NAME} API</dt>
               <dd className="mt-0.5 font-medium text-foreground">
                 {failoverStatus.codexApiReady ? "Ready" : "Not ready"}
               </dd>
@@ -353,12 +354,12 @@ export function SessionMonitoringPanel({
         </Card>
       ) : null}
 
-      <Card icon={<GitBranch className="h-4 w-4" />} title={`Codex threads (${threads.length})`}>
+      <Card icon={<GitBranch className="h-4 w-4" />} title={`${TARGET_APP_NAME} threads (${threads.length})`}>
         {threadsError ? (
           <p className="text-[12px] text-muted-foreground">{threadsError}</p>
         ) : threads.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">
-            No Codex threads found yet. Start a conversation in Codex and refresh.
+            No threads found yet. Start a conversation in {TARGET_APP_NAME} and refresh.
           </p>
         ) : (
           <>
@@ -377,12 +378,12 @@ export function SessionMonitoringPanel({
       <Card title={`REST sessions (${sessions.length})`}>
         {sessionsError ? (
           <p className="text-[12px] text-muted-foreground">
-            Could not list sessions: {sessionsError}. Codex must be running with REST /sessions
+            Could not list sessions: {sessionsError}. {TARGET_APP_NAME} must be running with REST /sessions
             available.
           </p>
         ) : sessions.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">
-            No sessions returned from the Codex API. Expand a row when previews are available.
+            No sessions returned from the API. Expand a row when previews are available.
           </p>
         ) : (
           <ul className="space-y-2">

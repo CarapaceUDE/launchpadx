@@ -84,7 +84,7 @@ pub fn enable_auto_start() -> Result<(), AutoStartError> {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.codex-launchpad.launcher</string>
+    <string>com.launchpadx.launcher</string>
     <key>ProgramArguments</key>
     <array>
         <string>{}</string>
@@ -98,7 +98,7 @@ pub fn enable_auto_start() -> Result<(), AutoStartError> {
         binary_path
     );
 
-    let plist_path = launch_agents.join("com.codex-launchpad.launcher.plist");
+    let plist_path = launch_agents.join("com.launchpadx.launcher.plist");
     fs::write(&plist_path, plist.as_bytes())
         .map_err(|source| AutoStartError::WriteEntry { source })?;
 
@@ -115,7 +115,7 @@ pub fn enable_auto_start() -> Result<(), AutoStartError> {
 pub fn disable_auto_start() -> Result<(), AutoStartError> {
     let home = dirs::home_dir().ok_or(AutoStartError::MissingHome)?;
     let launch_agents = home.join("Library/LaunchAgents");
-    let plist_path = launch_agents.join("com.codex-launchpad.launcher.plist");
+    let plist_path = launch_agents.join("com.launchpadx.launcher.plist");
 
     if plist_path.exists() {
         let _output = Command::new("launchctl")
@@ -144,7 +144,7 @@ pub fn enable_auto_start() -> Result<(), AutoStartError> {
     let desktop = format!(
         r#"[Desktop Entry]
 Type=Application
-Name=Codex Launchpad
+Name=LaunchPadX
 Comment=Launch Codex with local Ollama endpoint
 Exec={}
 Terminal=false
@@ -154,7 +154,7 @@ X-GNOME-Autostart-enabled=true
         binary_path
     );
 
-    let desktop_path = autostart_dir.join("codex-launchpad.desktop");
+    let desktop_path = autostart_dir.join("launchpadx.desktop");
     fs::write(&desktop_path, desktop.as_bytes())
         .map_err(|source| AutoStartError::WriteEntry { source })?;
 
@@ -165,7 +165,7 @@ X-GNOME-Autostart-enabled=true
 pub fn disable_auto_start() -> Result<(), AutoStartError> {
     let home = dirs::home_dir().ok_or(AutoStartError::MissingHome)?;
     let autostart_dir = home.join(".config/autostart");
-    let desktop_path = autostart_dir.join("codex-launchpad.desktop");
+    let desktop_path = autostart_dir.join("launchpadx.desktop");
 
     if desktop_path.exists() {
         fs::remove_file(&desktop_path).map_err(|source| AutoStartError::WriteEntry { source })?;

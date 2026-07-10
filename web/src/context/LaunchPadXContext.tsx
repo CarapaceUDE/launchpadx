@@ -17,7 +17,7 @@ import {
   type CodexConfigInspection,
   type CodexProfileState,
   type ProviderMode,
-} from "../lib/codexProfile";
+} from "../lib/lpadProfile";
 import { pickDefaultModel, reconcileModelSelection } from "../lib/modelSelection";
 import {
   blocksLaunchToggle,
@@ -34,7 +34,7 @@ import {
   shouldSyncCodexToDisk,
 } from "../lib/providerGuards";
 import type { ServerPillState } from "../components/launcher/primitives";
-import { APP_NAME } from "../lib/branding";
+import { APP_NAME, TARGET_APP_NAME } from "../lib/branding";
 
 export type NavKey = "launcher" | "sessions" | "settings" | "logs" | "about";
 
@@ -75,7 +75,7 @@ interface LauncherState {
   rateLimitsLoading: boolean;
 }
 
-interface LauncherContextValue extends LauncherState {
+interface LaunchPadXContextValue extends LauncherState {
   launch: () => Promise<void>;
   stop: () => Promise<void>;
   writeCodexConfig: () => Promise<void>;
@@ -95,7 +95,7 @@ interface LauncherContextValue extends LauncherState {
   captureCheckpoint: () => Promise<void>;
 }
 
-const LauncherContext = createContext<LauncherContextValue | null>(null);
+const LaunchPadXContext = createContext<LaunchPadXContextValue | null>(null);
 
 const SAVE_DEBOUNCE_MS = 800;
 const CODEX_SYNC_DEBOUNCE_MS = 1200;
@@ -146,7 +146,7 @@ function applyInspection(
   return inspection ? inspectionToProfile(inspection) : fallback;
 }
 
-export function LauncherProvider({ children }: { children: ReactNode }) {
+export function LaunchPadXProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<LauncherState>({
     running: false,
     apiReady: false,
@@ -336,7 +336,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
           statusMessage: quiet
             ? prev.statusMessage
             : providerSwitchSuccessMessage(
-                payload.message ?? "Codex profile synchronized.",
+                payload.message ?? "Profile synchronized.",
                 force && prev.serverState === "running",
               ),
           statusVariant: quiet ? prev.statusVariant : "success",
@@ -350,7 +350,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
           ...prev,
           codexSyncing: false,
           operation: quiet ? prev.operation : "idle",
-          statusMessage: quiet ? prev.statusMessage : `Codex sync failed: ${msg}`,
+          statusMessage: quiet ? prev.statusMessage : `Profile sync failed: ${msg}`,
           statusVariant: quiet ? prev.statusVariant : "error",
         }));
       }
@@ -546,7 +546,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     async (profileName?: string) => {
       setOperation(
         "failover_switching",
-        "Codex quota hit — switching to local provider and restarting...",
+        "Cloud quota hit — switching to local provider and restarting...",
       );
       try {
         const result = await window.codexRPC.failoverToLocal(profileName);
@@ -560,7 +560,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
           operation: "idle",
           statusMessage:
             payload.message ??
-            "Failover complete. Paste the resume prompt into Codex to continue.",
+            `Failover complete. Paste the resume prompt into ${TARGET_APP_NAME} to continue.`,
           statusVariant: "success",
         }));
         await inspectCodexProfile();
@@ -630,7 +630,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       await navigator.clipboard.writeText(prompt);
       setState((prev) => ({
         ...prev,
-        statusMessage: "Resume prompt copied. Paste it into Codex after restart.",
+        statusMessage: `Resume prompt copied. Paste it into ${TARGET_APP_NAME} after restart.`,
         statusVariant: "success",
       }));
     } catch (e) {
@@ -714,9 +714,9 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     void (async () => {
       setOperation("initializing", "Loading configuration...");
       await loadConfig();
-      setOperation("initializing", "Inspecting Codex profile...");
+      setOperation("initializing", "Inspecting profile...");
       const profile = await inspectCodexProfile();
-      setOperation("initializing", "Checking Codex status...");
+      setOperation("initializing", `Checking ${TARGET_APP_NAME} status...`);
       await healthCheck();
       setOperation("initializing", "Discovering models...");
       await refreshModels();
@@ -733,7 +733,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     if (blocksLaunchToggle(operationRef.current)) {
       setState((prev) => ({
         ...prev,
-        statusMessage: "Wait for the current operation to finish before starting Codex.",
+        statusMessage: `Wait for the current operation to finish before starting ${TARGET_APP_NAME}.`,
         statusVariant: "error",
       }));
       return;
@@ -747,26 +747,26 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     if (!startCheck.canStart) {
       setState((prev) => ({
         ...prev,
-        statusMessage: startCheck.reason ?? "Cannot start Codex with the current settings.",
+        statusMessage: startCheck.reason ?? `Cannot start ${TARGET_APP_NAME} with the current settings.`,
         statusVariant: "error",
       }));
       return;
     }
 
-    setOperation("launching", "Starting Codex — saving your settings...");
+    setOperation("launching", `Starting ${TARGET_APP_NAME} — saving your settings...`);
     try {
       await flushConfigSave();
       if (shouldSyncCodexToDisk(codexProfileRef.current, configRef.current)) {
-        setOperation("launching", "Starting Codex — syncing Codex profile...");
+        setOperation("launching", `Starting ${TARGET_APP_NAME} — syncing profile...`);
         await syncCodexProfile(configRef.current, true, undefined, true);
       }
-      setOperation("launching", "Starting Codex — launching process...");
+      setOperation("launching", `Starting ${TARGET_APP_NAME} — launching process...`);
       const result = await window.codexRPC.launch(configRef.current);
       const payload = unwrap(result);
-      const message = (payload as { message?: string }).message ?? "Codex launch requested.";
+      const message = (payload as { message?: string }).message ?? `${TARGET_APP_NAME} launch requested.`;
       const launchTarget = (payload as { launchTarget?: string }).launchTarget ?? "";
       const isStoreLaunch = launchTarget.startsWith("StartAppID:");
-      setOperation("waiting_for_codex", `${message} Waiting for Codex to appear...`);
+      setOperation("waiting_for_codex", `${message} Waiting for ${TARGET_APP_NAME} to appear...`);
       clearPoll();
       let attempts = 0;
       const maxAttempts = isStoreLaunch ? 45 : 30;
@@ -793,14 +793,14 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
               operation: "idle",
               serverState: "stopped",
               statusMessage: isStoreLaunch
-                ? "Codex may still be opening via the Microsoft Store app. Check your taskbar, or set codexCommand in Settings to a full path such as %LOCALAPPDATA%\\Programs\\Codex\\Codex.exe."
-                : "Codex did not start within 60 seconds. Check logs, set codexCommand in Settings, or run codex-launchpad --diagnose.",
+                ? `${TARGET_APP_NAME} may still be opening via the Microsoft Store app. Check your taskbar, or set the command override in Settings to a full path such as %LOCALAPPDATA%\\Programs\\Codex\\Codex.exe.`
+                : `${TARGET_APP_NAME} did not start within 60 seconds. Check logs, set the command override in Settings, or run launchpadx --diagnose.`,
               statusVariant: "error",
             }));
           } else if (attempts % 3 === 0) {
             setState((prev) => ({
               ...prev,
-              statusMessage: `Still waiting for Codex to start (${attempts * 2}s)...`,
+              statusMessage: `Still waiting for ${TARGET_APP_NAME} to start (${attempts * 2}s)...`,
             }));
           }
         } catch {
@@ -834,11 +834,11 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       return;
     }
     clearPoll();
-    setOperation("stopping", "Stopping Codex...");
+    setOperation("stopping", `Stopping ${TARGET_APP_NAME}...`);
     try {
       const result = await window.codexRPC.stop();
       const payload = unwrap(result);
-      const message = (payload as { message?: string }).message ?? "Codex stopped.";
+      const message = (payload as { message?: string }).message ?? `${TARGET_APP_NAME} stopped.`;
       const healthResult = await window.codexRPC.healthCheck(configRef.current);
       const health = unwrap(healthResult);
       applyHealth(
@@ -892,7 +892,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         writingCodex: false,
         codexProfile: profile,
         statusMessage: providerSwitchSuccessMessage(
-          payload.message ?? "Local API is now active for Codex.",
+          payload.message ?? `Local API is now active for ${TARGET_APP_NAME}.`,
           prev.serverState === "running",
         ),
         statusVariant: "success",
@@ -910,7 +910,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     }
   }, [flushConfigSave, setOperation]);
 
-  const revertCodexConfig = useCallback(async (statusMessage = "Switching to Codex Account...") => {
+  const revertCodexConfig = useCallback(async (statusMessage = "Switching to Cloud Account...") => {
     setOperation("reverting_codex", statusMessage);
     setState((prev) => ({ ...prev, revertingCodex: true }));
     try {
@@ -928,7 +928,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
         revertingCodex: false,
         codexProfile: profile,
         statusMessage: providerSwitchSuccessMessage(
-          payload.message ?? "Codex Account is now active.",
+          payload.message ?? "Cloud Account is now active.",
           prev.serverState === "running",
         ),
         statusVariant: "success",
@@ -936,7 +936,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       const refreshed = await inspectCodexProfile();
       if (profileStillOnLocalProvider(refreshed)) {
         throw new Error(
-          "Codex config still points to a local provider after switching to Codex Account.",
+          "Profile still points to a local provider after switching to Cloud Account.",
         );
       }
     } catch (e) {
@@ -1022,26 +1022,44 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   const selectModel = useCallback(
     async (model: string) => {
       const trimmed = model.trim();
-      if (!trimmed) return;
+      if (!trimmed || configRef.current.codexModel === trimmed) return;
 
-      setOperation("selecting_model", `Selected model: ${trimmed}`);
       const next = normalizeConfig({ ...configRef.current, codexModel: trimmed });
       configRef.current = next;
-      setState((prev) => ({ ...prev, config: next }));
+      const onLocal = activeProviderMode(codexProfileRef.current) === "local";
 
+      // Picking a model while still on Cloud Account is just a launcher preference —
+      // update instantly and persist in the background. No profile sync yet.
+      if (!onLocal) {
+        setState((prev) => ({
+          ...prev,
+          config: next,
+          statusMessage: `Model preference set to ${trimmed}. Click Local API to switch and apply.`,
+          statusVariant: "success",
+        }));
+        void flushConfigSave().catch((e) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          setState((prev) => ({
+            ...prev,
+            statusMessage: `Failed to save model preference: ${msg}`,
+            statusVariant: "error",
+          }));
+        });
+        return;
+      }
+
+      setOperation("selecting_model", `Applying model: ${trimmed}`);
       try {
         await flushConfigSave();
-        const onLocal = activeProviderMode(codexProfileRef.current) === "local";
         if (shouldSyncCodexToDisk(codexProfileRef.current, next)) {
           await syncCodexProfile(next, true, undefined, true);
         }
         operationRef.current = "idle";
         setState((prev) => ({
           ...prev,
+          config: next,
           operation: "idle",
-          statusMessage: onLocal
-            ? `Model set to ${trimmed}.`
-            : `Model saved as ${trimmed}. Switch to Local API to apply.`,
+          statusMessage: `Model set to ${trimmed}.`,
           statusVariant: "success",
         }));
       } catch (e) {
@@ -1115,7 +1133,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value: LauncherContextValue = {
+  const value: LaunchPadXContextValue = {
     ...state,
     launch,
     stop,
@@ -1136,12 +1154,12 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     captureCheckpoint,
   };
 
-  return <LauncherContext.Provider value={value}>{children}</LauncherContext.Provider>;
+  return <LaunchPadXContext.Provider value={value}>{children}</LaunchPadXContext.Provider>;
 }
 
-export function useLauncher() {
-  const ctx = useContext(LauncherContext);
-  if (!ctx) throw new Error("useLauncher must be used within LauncherProvider");
+export function useLaunchPadX() {
+  const ctx = useContext(LaunchPadXContext);
+  if (!ctx) throw new Error("useLaunchPadX must be used within LaunchPadXProvider");
   return ctx;
 }
 
@@ -1150,8 +1168,8 @@ export function configToCodexForm(config: LauncherConfig): CodexConfigForm {
     (config[key] as string | undefined) ?? fallback;
 
   return {
-    codexProviderId: get("codexProviderId", "codex-launchpad"),
-    codexProviderName: get("codexProviderName", "Codex Launchpad"),
+    codexProviderId: get("codexProviderId", "launchpadx"),
+    codexProviderName: get("codexProviderName", "LaunchPadX"),
     codexConfigPath: get("codexConfigPath", ""),
     codexCommand: get("codexCommand", ""),
     codexApiPort: String(config.codexApiPort ?? 4000),

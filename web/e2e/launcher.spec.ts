@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Codex Launchpad", () => {
+test.describe("LaunchPadX", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("page-launcher")).toBeVisible();
@@ -10,7 +10,7 @@ test.describe("Codex Launchpad", () => {
   });
 
   test("loads the launcher shell", async ({ page }) => {
-    await expect(page.getByRole("heading", { name: "Codex Launchpad" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "LaunchPadX" })).toBeVisible();
     await expect(page.getByTestId("provider-mode-card")).toBeVisible();
     await expect(page.getByTestId("provider-mode-codex")).toBeVisible();
     await expect(page.getByTestId("provider-mode-local")).toBeVisible();
@@ -67,19 +67,19 @@ test.describe("Codex Launchpad", () => {
     await page.getByTestId("nav-sessions").click();
     await expect(page.getByTestId("session-monitoring-panel")).toBeVisible();
     await expect(page.getByText("Watch status")).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Codex threads/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /threads/ })).toBeVisible();
     await expect(page.getByTestId("discovery-log-viewer")).toBeVisible();
   });
 
   test("local settings includes models catalog", async ({ page }) => {
     await page.getByTestId("nav-settings").click();
     await expect(page.getByTestId("local-models-catalog")).toBeVisible();
-    await expect(page.getByText(/Select the active model on the Launchpad/i)).toBeVisible();
+    await expect(page.getByText(/Select the active model on the LaunchPadX/i)).toBeVisible();
   });
 
   test("sidebar navigation reaches About", async ({ page }) => {
     await page.getByTestId("nav-about").click();
-    await expect(page.getByRole("heading", { name: "Codex Launchpad" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "LaunchPadX" })).toBeVisible();
     await expect(page.getByText("A Carapace LLC community project")).toBeVisible();
     await expect(page.getByRole("link", { name: "Join Community" })).toHaveAttribute(
       "href",

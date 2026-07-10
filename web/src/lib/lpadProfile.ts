@@ -72,13 +72,13 @@ export function activeProviderMode(profile: CodexProfileState): ProviderMode {
 }
 
 export function providerModeLabel(mode: ProviderMode): string {
-  return mode === "local" ? "Local API" : "Codex Account";
+  return mode === "local" ? "Local API" : "Cloud Account";
 }
 
 export function providerModeDescription(mode: ProviderMode): string {
   return mode === "local"
-    ? "Route Codex through your Ollama or OpenAI-compatible endpoint and chosen model."
-    : "Use Codex sign-in and your default Codex cloud provider settings.";
+    ? "Route through your Ollama or OpenAI-compatible endpoint and chosen model."
+    : "Use your OpenAI account sign-in and default cloud provider settings.";
 }
 
 export function activeProviderSummary(
@@ -90,15 +90,15 @@ export function activeProviderSummary(
   if (mode === "local") {
     const parts = [model ?? profile.model, endpoint ?? profile.baseUrl].filter(Boolean);
     return parts.length > 0
-      ? `Codex is using Local API · ${parts.join(" · ")}`
-      : "Codex is using Local API";
+      ? `Using Local API · ${parts.join(" · ")}`
+      : "Using Local API";
   }
 
   if (profile.modelProvider) {
-    return `Codex is using ${profile.modelProvider}${profile.model ? ` · ${profile.model}` : ""}`;
+    return `Using ${profile.modelProvider}${profile.model ? ` · ${profile.model}` : ""}`;
   }
 
-  return "Codex is using your account sign-in";
+  return "Using your cloud account sign-in";
 }
 
 export function profileStatusLabel(status: CodexProfileStatus): string {
@@ -106,9 +106,9 @@ export function profileStatusLabel(status: CodexProfileStatus): string {
     case "managed":
       return "Local API active";
     case "external":
-      return "Codex account active";
+      return "Cloud account active";
     case "missing":
-      return "Codex config not found";
+      return "Profile config not found";
     default:
       return "Checking provider...";
   }

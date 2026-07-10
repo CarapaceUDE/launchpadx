@@ -1,11 +1,11 @@
 import { Rocket, Activity, Settings, FileText, Info, RefreshCw, ChevronRight } from "lucide-react";
 import { AppIcon } from "./AppIcon";
 import { ThemeToggle } from "./ThemeToggle";
-import type { NavKey } from "../../context/LauncherContext";
-import { APP_NAME, LICENSE_NOTICE, LICENSE_URL } from "../../lib/branding";
+import type { NavKey } from "../../context/LaunchPadXContext";
+import { APP_NAME, APP_TAGLINE, LICENSE_NOTICE, LICENSE_URL } from "../../lib/branding";
 
 const items: { key: NavKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { key: "launcher", label: "Launchpad", icon: Rocket },
+  { key: "launcher", label: "Home", icon: Rocket },
   { key: "sessions", label: "Sessions", icon: Activity },
   { key: "settings", label: "Settings", icon: Settings },
   { key: "logs", label: "Logs", icon: FileText },
@@ -40,9 +40,9 @@ export function Sidebar({
             </div>
             <div className="hidden min-w-0 lg:block">
               <div className="text-[15px] font-semibold leading-tight tracking-tight text-white">
-                Codex
+                {APP_NAME}
               </div>
-              <div className="text-[12px] leading-tight text-white/70">Launchpad</div>
+              <div className="text-[12px] leading-tight text-white/70">{APP_TAGLINE}</div>
             </div>
           </div>
         </div>

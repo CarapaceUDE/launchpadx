@@ -50,6 +50,13 @@ terminals/
 # Logs and diagnostics
 *.log
 *.trace
+*.jsonl
+
+# Compiler probes accidentally emitted at the repository root
+/*.o
+/*.pdb
+/*_probe*
+/0
 
 # OS/editor noise
 .DS_Store

@@ -7,9 +7,9 @@ cd "$ROOT"
 CONFIG_PATH="${1:-$ROOT/config.json}"
 
 if [[ "$(uname -s)" == "MINGW"* || "$(uname -s)" == "MSYS"* || "$(uname -s)" == "CYGWIN"* ]]; then
-  BIN_NAME="codex-launchpad.exe"
+  BIN_NAME="launchpadx.exe"
 else
-  BIN_NAME="codex-launchpad"
+  BIN_NAME="launchpadx"
 fi
 
 RELEASE_BIN="$ROOT/target/release/$BIN_NAME"

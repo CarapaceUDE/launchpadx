@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 
@@ -6,7 +6,7 @@ $root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 # and accidentally falls through to the default Codex-launch code path.
 Push-Location $root
 try {
-    cargo run --release --bin codex-launchpad -- --build-check
+    cargo run --release --bin launchpadx -- --build-check
     exit $LASTEXITCODE
 } finally {
     Pop-Location

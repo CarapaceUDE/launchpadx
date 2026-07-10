@@ -6,7 +6,7 @@ use chrono::Utc;
 use serde::Serialize;
 use serde_json::Value;
 
-const DISCOVERY_DIR: &str = ".codex-launchpad/discovery";
+const DISCOVERY_DIR: &str = ".launchpadx/discovery";
 const DISCOVERY_FILE: &str = "rate-limit.jsonl";
 const APP_LOG_PREFIX: &str = "RATE_LIMIT_WATCH";
 

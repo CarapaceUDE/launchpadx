@@ -9,9 +9,9 @@ const NPM_COMMAND: &str = "npm";
 
 pub fn run(project_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let binary_name = if cfg!(windows) {
-        "codex-launchpad.exe"
+        "launchpadx.exe"
     } else {
-        "codex-launchpad"
+        "launchpadx"
     };
 
     let bin_path = project_root.join("target/release").join(binary_name);
@@ -48,7 +48,7 @@ pub fn run(project_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_cargo_build(project_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let status = Command::new("cargo")
-        .args(["build", "--release", "--bin", "codex-launchpad"])
+        .args(["build", "--release", "--bin", "launchpadx"])
         .current_dir(project_root)
         .status()?;
 
@@ -219,10 +219,8 @@ mod tests {
 
     #[test]
     fn tree_has_file_newer_than_detects_recent_source() {
-        let temp = std::env::temp_dir().join(format!(
-            "codex-launchpad-build-check-{}",
-            std::process::id()
-        ));
+        let temp =
+            std::env::temp_dir().join(format!("launchpadx-build-check-{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp);
         fs::create_dir_all(temp.join("src")).unwrap();
         fs::write(temp.join("src/lib.rs"), "old").unwrap();
@@ -238,10 +236,8 @@ mod tests {
 
     #[test]
     fn tree_has_file_newer_than_is_false_when_up_to_date() {
-        let temp = std::env::temp_dir().join(format!(
-            "codex-launchpad-build-check-ok-{}",
-            std::process::id()
-        ));
+        let temp =
+            std::env::temp_dir().join(format!("launchpadx-build-check-ok-{}", std::process::id()));
         let _ = fs::remove_dir_all(&temp);
         fs::create_dir_all(temp.join("src")).unwrap();
         fs::write(temp.join("src/lib.rs"), "stable").unwrap();

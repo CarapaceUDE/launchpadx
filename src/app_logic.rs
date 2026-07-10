@@ -1,8 +1,8 @@
 use crate::acp_client::{AcpClient, MessageResponse};
-use crate::codex_config;
-use crate::codex_process::{CodexProcess, CodexProcessInfo, ProcessState};
 use crate::config::LauncherConfig;
 use crate::launcher::{self, LaunchTarget};
+use crate::lpad_config;
+use crate::lpad_process::{CodexProcess, CodexProcessInfo, ProcessState};
 use crate::ollama;
 use std::error::Error;
 use std::fs;
@@ -18,13 +18,13 @@ pub fn default_config_path(root: &Path) -> PathBuf {
     }
 }
 
-pub fn codex_pid_file(config_path: &Path) -> PathBuf {
+pub fn lpad_pid_file(config_path: &Path) -> PathBuf {
     // Place PID file next to config
     config_path.with_extension("pid")
 }
 
 pub fn codex_managed_by_launcher(config: &LauncherConfig) -> bool {
-    codex_config::inspect(config)
+    lpad_config::inspect(config)
         .map(|inspection| inspection.managed_by_launcher)
         .unwrap_or(false)
 }
@@ -51,18 +51,18 @@ pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
     let resolved_model = if config.discover_ollama_models() {
         ollama::resolve_model(config, &base_url)?
     } else {
-        config.codex_model()
+        config.lpad_model()
     };
 
-    if config.persist_codex_config() {
-        let persistent_config = codex_config::PersistentCodexConfig::from_launcher_config(
+    if config.lpad_persist_config() {
+        let persistent_config = lpad_config::PersistentCodexConfig::from_launcher_config(
             config,
             resolved_model,
             base_url,
             api_key,
         )?;
         let path = persistent_config.config_path.display().to_string();
-        codex_config::apply(&persistent_config)?;
+        lpad_config::apply(&persistent_config)?;
         return Ok(format!("Updated Codex config: {path}"));
     }
 
@@ -70,7 +70,7 @@ pub fn write_config(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
 }
 
 pub fn restore(config: &LauncherConfig) -> Result<String, Box<dyn Error>> {
-    let (restored_path, _) = codex_config::restore(config)?;
+    let (restored_path, _) = lpad_config::restore(config)?;
     Ok(format!(
         "Restored Codex config: {}",
         restored_path.display()
@@ -111,7 +111,7 @@ pub fn launch(
 
     let local_api = local_api_env(config)?;
     let working_directory = config.working_directory(root)?;
-    let codex_args = config.codex_args();
+    let lpad_args = config.lpad_args();
     let target = launcher::resolve(config)?;
     let launch_target = target.to_string();
 
@@ -123,7 +123,7 @@ pub fn launch(
             CodexProcess::spawn(
                 command,
                 &working_directory,
-                &codex_args,
+                &lpad_args,
                 local_api
                     .as_ref()
                     .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
@@ -132,9 +132,9 @@ pub fn launch(
             #[cfg(target_os = "windows")]
             if !launcher::wait_for_codex_process(10) {
                 return Err(format!(
-                    "Codex launch was requested via {launch_target}, but no Codex process appeared. Set codexCommand in Settings to the full path of Codex.exe or run `codex-launchpad --diagnose`."
+                    "Codex launch was requested via {launch_target}, but no Codex process appeared. Set codexCommand in Settings to the full path of Codex.exe or run `launchpadx --diagnose`."
                 )
-                .into());
+               .into());
             }
         }
         LaunchTarget::WindowsStartApp { app_id } => {
@@ -161,7 +161,7 @@ pub async fn launch_and_wait(
 ) -> Result<CodexProcess, Box<dyn Error>> {
     let local_api = local_api_env(config)?;
     let working_directory = config.working_directory(root)?;
-    let codex_args = config.codex_args();
+    let lpad_args = config.lpad_args();
     let target = launcher::resolve(config)?;
 
     let mut process = match &target {
@@ -172,7 +172,7 @@ pub async fn launch_and_wait(
             CodexProcess::spawn(
                 command,
                 &working_directory,
-                &codex_args,
+                &lpad_args,
                 local_api
                     .as_ref()
                     .map(|(base_url, api_key)| (base_url.as_str(), api_key.as_str())),
@@ -375,18 +375,18 @@ pub fn detect_codex_process(config: &LauncherConfig, root: &Path) -> CodexProces
 
     let codex_health_url = format!("{}/health", config.codex_api_base_url());
     if endpoint_responds(&codex_health_url, None, 2) {
-        if let Some((pid, _method)) = detect_process_on_port(config.codex_api_port()) {
+        if let Some((pid, _method)) = detect_process_on_port(config.lpad_api_port()) {
             return CodexProcessInfo {
                 running: true,
                 pid: Some(pid),
-                method: Some("codex_api_port".to_string()),
+                method: Some("lpad_api_port".to_string()),
                 restart_required: true,
             };
         }
         return CodexProcessInfo {
             running: true,
             pid: None,
-            method: Some("codex_api_port".to_string()),
+            method: Some("lpad_api_port".to_string()),
             restart_required: true,
         };
     }
@@ -401,7 +401,7 @@ pub fn detect_codex_process(config: &LauncherConfig, root: &Path) -> CodexProces
 
 fn is_launcher_process_name(name: &str) -> bool {
     let lower = name.to_lowercase();
-    lower.contains("codex-launchpad") || lower.contains("codex_launchpad")
+    lower.contains("launchpadx")
 }
 
 /// Detect if a Codex process is running by name (cross-platform).
@@ -744,20 +744,20 @@ pub fn kill_codex_by_pid_number(pid: u32) -> Result<String, Box<dyn Error>> {
 
 pub fn inspect_codex_config(
     config: &LauncherConfig,
-) -> Result<codex_config::CodexConfigInspection, Box<dyn Error>> {
-    Ok(codex_config::inspect(config)?)
+) -> Result<lpad_config::CodexConfigInspection, Box<dyn Error>> {
+    Ok(lpad_config::inspect(config)?)
 }
 
 /// Merge launcher settings with the live Codex profile on first launch.
 pub fn bootstrap_launcher_from_codex(
     config: &mut LauncherConfig,
-    inspection: &codex_config::CodexConfigInspection,
+    inspection: &lpad_config::CodexConfigInspection,
 ) -> Vec<String> {
     let mut changes = Vec::new();
 
-    if config.codex_model().is_none() {
+    if config.lpad_model().is_none() {
         if let Some(model) = inspection.model.as_ref().filter(|m| !m.is_empty()) {
-            config.codex_model = Some(model.clone());
+            config.lpad_model = Some(model.clone());
             changes.push(format!("Adopted Codex model: {model}"));
         }
     }
@@ -782,13 +782,13 @@ pub fn revert_codex_config(config: &LauncherConfig) -> Result<String, Box<dyn Er
     let config_path = config
         .codex_config_path()
         .map(Ok)
-        .unwrap_or_else(codex_config::default_codex_config_path)?;
+        .unwrap_or_else(lpad_config::default_codex_config_path)?;
 
     if !config_path.exists() {
         return Ok("Codex config file does not exist; nothing to revert.".to_string());
     }
 
-    let (restored_path, warning) = codex_config::restore(config)?;
+    let (restored_path, warning) = lpad_config::restore(config)?;
     let message = if let Some(w) = warning {
         format!(
             "Switched Codex back to account provider at {} -- {w}",

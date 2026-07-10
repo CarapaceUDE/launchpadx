@@ -4,8 +4,9 @@ import {
   shouldAutoSyncCodex,
   type CodexProfileState,
   type ProviderMode,
-} from "./codexProfile";
+} from "./lpadProfile";
 import type { LauncherOperation } from "./operationStatus";
+import { APP_NAME, TARGET_APP_NAME } from "./branding";
 
 export type GuardResult = { ok: true } | { ok: false; message: string };
 
@@ -68,7 +69,7 @@ export function shouldSyncCodexToDisk(
 }
 
 export function persistCodexDisabledMessage(): string {
-  return "Persistent Codex config is disabled. Enable it in Settings → Advanced to apply provider changes.";
+  return `Persistent profile sync is disabled. Enable it in Settings → Advanced to apply provider changes.`;
 }
 
 export function codexAccountSwitchWarnings(
@@ -79,14 +80,16 @@ export function codexAccountSwitchWarnings(
 
   if (profile.status === "managed" && !profile.restoreAvailable) {
     warnings.push(
-      "No restore snapshot was found. The launcher will still remove local provider settings and switch Codex back to your account provider when possible.",
+      `No restore snapshot was found. ${APP_NAME} will still remove local provider settings and switch back to your cloud account when possible.`,
     );
   }
   if (profile.status === "missing") {
-    warnings.push("Codex config file is missing. Switching will start from a clean profile.");
+    warnings.push("Profile config file is missing. Switching will start from a clean profile.");
   }
   if (codexRunning) {
-    warnings.push("Codex is running — restart it after switching for the change to take effect.");
+    warnings.push(
+      `${TARGET_APP_NAME} is running — restart it after switching for the change to take effect.`,
+    );
   }
 
   return warnings;
@@ -94,11 +97,13 @@ export function codexAccountSwitchWarnings(
 
 export function localSwitchWarnings(codexRunning: boolean): string[] {
   return codexRunning
-    ? ["Codex is running — restart it after switching for the new model provider to apply."]
+    ? [
+        `${TARGET_APP_NAME} is running — restart it after switching for the new model provider to apply.`,
+      ]
     : [];
 }
 
 export function providerSwitchSuccessMessage(base: string, codexRunning: boolean): string {
   if (!codexRunning) return base;
-  return `${base} Restart Codex for the change to take effect.`;
+  return `${base} Restart ${TARGET_APP_NAME} for the change to take effect.`;
 }

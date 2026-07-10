@@ -9,8 +9,9 @@ import {
     isRateLimitReached,
     toneClass,
 } from "../../lib/rateLimits";
+import { TARGET_APP_NAME } from "../../lib/branding";
 
-export function CodexRateLimitsPanel({
+export function LaunchPadXRateLimitsPanel({
     status,
     loading,
     onRefresh,
@@ -30,7 +31,7 @@ export function CodexRateLimitsPanel({
                 <div>
                     <p className="text-[13px] font-medium text-foreground">Usage limits</p>
                     <p className="text-[11px] text-muted-foreground">
-                        Shared agentic usage from your signed-in Codex account
+                        Shared agentic usage from your signed-in cloud account
                     </p>
                 </div>
                 <button
@@ -52,7 +53,7 @@ export function CodexRateLimitsPanel({
 
             {reached ? (
                 <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
-                    Codex reports a usage limit reached
+                    {TARGET_APP_NAME} reports a usage limit reached
                     {status?.rateLimits?.rateLimitReachedType
                         ? ` (${status.rateLimits.rateLimitReachedType})`
                         : ""}
@@ -92,7 +93,7 @@ export function CodexRateLimitsPanel({
                         ? "Run `codex login` on this machine to load account usage."
                         : status?.error
                           ? status.error
-                          : "Usage data is not available yet. Refresh after Codex CLI is installed and signed in."}
+                          : `Usage data is not available yet. Refresh after ${TARGET_APP_NAME} CLI is installed and signed in.`}
                 </p>
             )}
 
@@ -117,7 +118,7 @@ export function CodexRateLimitsPanel({
     );
 }
 
-export function CodexRateLimitsCompact({
+export function LaunchPadXRateLimitsCompact({
     status,
     loading,
 }: {

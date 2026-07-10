@@ -4,4 +4,4 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 . "$PSScriptRoot\lib.ps1"
 
-& (Get-CargoCommand) run --bin codex-launchpad -- @args
+& (Get-CargoCommand) run --bin launchpadx -- @args

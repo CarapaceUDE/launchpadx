@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$ConfigPath = $(Join-Path $PSScriptRoot "config.json")
 )
@@ -6,8 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-$releaseBinary = Join-Path $root "target\release\codex-launchpad.exe"
-$debugBinary = Join-Path $root "target\debug\codex-launchpad.exe"
+$releaseBinary = Join-Path $root "target\release\launchpadx.exe"
+$debugBinary = Join-Path $root "target\debug\launchpadx.exe"
 
 if (Test-Path -LiteralPath $releaseBinary) {
     & $releaseBinary --diagnose --config $ConfigPath

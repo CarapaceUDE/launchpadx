@@ -5,8 +5,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-
-
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("missing config file: {0}; copy config.example.json to config.json and fill it in")]
@@ -53,17 +51,25 @@ pub struct LauncherConfig {
     pub ollama_port: Option<u16>,
     pub ollama_scheme: Option<String>,
     pub api_key: Option<String>,
-    pub persist_codex_config: Option<bool>,
-    pub codex_model: Option<String>,
-    pub codex_provider_id: Option<String>,
-    pub codex_provider_name: Option<String>,
-    pub codex_api_key_mode: Option<ApiKeyMode>,
+    #[serde(rename = "persistCodexConfig", alias = "lpadPersistConfig")]
+    pub lpad_persist_config: Option<bool>,
+    #[serde(rename = "codexModel", alias = "lpadModel")]
+    pub lpad_model: Option<String>,
+    #[serde(rename = "codexProviderId", alias = "lpadProviderId")]
+    pub lpad_provider_id: Option<String>,
+    #[serde(rename = "codexProviderName", alias = "lpadProviderName")]
+    pub lpad_provider_name: Option<String>,
+    #[serde(rename = "codexApiKeyMode", alias = "lpadApiKeyMode")]
+    pub lpad_api_key_mode: Option<ApiKeyMode>,
     pub codex_config_path: Option<String>,
     pub codex_command: Option<String>,
-    pub codex_api_port: Option<u16>,
-    pub codex_api_scheme: Option<String>,
+    #[serde(rename = "codexApiPort", alias = "lpadApiPort")]
+    pub lpad_api_port: Option<u16>,
+    #[serde(rename = "codexApiScheme", alias = "lpadApiScheme")]
+    pub lpad_api_scheme: Option<String>,
     pub discover_ollama_models: Option<bool>,
-    pub codex_args: Option<Vec<String>>,
+    #[serde(rename = "codexArgs", alias = "lpadArgs")]
+    pub lpad_args: Option<Vec<String>>,
     pub working_directory: Option<String>,
     pub failover: Option<FailoverSettings>,
     pub profiles: Option<HashMap<String, ProfileOverlay>>,
@@ -107,10 +113,14 @@ pub struct ProfileOverlay {
     pub ollama_port: Option<u16>,
     pub ollama_scheme: Option<String>,
     pub api_key: Option<String>,
-    pub codex_model: Option<String>,
-    pub codex_provider_id: Option<String>,
-    pub codex_provider_name: Option<String>,
-    pub codex_api_key_mode: Option<ApiKeyMode>,
+    #[serde(rename = "codexModel", alias = "lpadModel")]
+    pub lpad_model: Option<String>,
+    #[serde(rename = "codexProviderId", alias = "lpadProviderId")]
+    pub lpad_provider_id: Option<String>,
+    #[serde(rename = "codexProviderName", alias = "lpadProviderName")]
+    pub lpad_provider_name: Option<String>,
+    #[serde(rename = "codexApiKeyMode", alias = "lpadApiKeyMode")]
+    pub lpad_api_key_mode: Option<ApiKeyMode>,
     pub working_directory: Option<String>,
 }
 
@@ -131,17 +141,17 @@ impl ProfileOverlay {
         if let Some(value) = &self.api_key {
             config.api_key = Some(value.clone());
         }
-        if let Some(value) = &self.codex_model {
-            config.codex_model = Some(value.clone());
+        if let Some(value) = &self.lpad_model {
+            config.lpad_model = Some(value.clone());
         }
-        if let Some(value) = &self.codex_provider_id {
-            config.codex_provider_id = Some(value.clone());
+        if let Some(value) = &self.lpad_provider_id {
+            config.lpad_provider_id = Some(value.clone());
         }
-        if let Some(value) = &self.codex_provider_name {
-            config.codex_provider_name = Some(value.clone());
+        if let Some(value) = &self.lpad_provider_name {
+            config.lpad_provider_name = Some(value.clone());
         }
-        if let Some(value) = self.codex_api_key_mode {
-            config.codex_api_key_mode = Some(value);
+        if let Some(value) = self.lpad_api_key_mode {
+            config.lpad_api_key_mode = Some(value);
         }
         if let Some(value) = &self.working_directory {
             config.working_directory = Some(value.clone());
@@ -235,20 +245,20 @@ impl LauncherConfig {
         merge_option(&mut self.ollama_port, &other.ollama_port);
         merge_option(&mut self.ollama_scheme, &other.ollama_scheme);
         merge_option(&mut self.api_key, &other.api_key);
-        merge_option(&mut self.persist_codex_config, &other.persist_codex_config);
-        merge_option(&mut self.codex_model, &other.codex_model);
-        merge_option(&mut self.codex_provider_id, &other.codex_provider_id);
-        merge_option(&mut self.codex_provider_name, &other.codex_provider_name);
-        merge_option(&mut self.codex_api_key_mode, &other.codex_api_key_mode);
+        merge_option(&mut self.lpad_persist_config, &other.lpad_persist_config);
+        merge_option(&mut self.lpad_model, &other.lpad_model);
+        merge_option(&mut self.lpad_provider_id, &other.lpad_provider_id);
+        merge_option(&mut self.lpad_provider_name, &other.lpad_provider_name);
+        merge_option(&mut self.lpad_api_key_mode, &other.lpad_api_key_mode);
         merge_option(&mut self.codex_config_path, &other.codex_config_path);
         merge_option(&mut self.codex_command, &other.codex_command);
-        merge_option(&mut self.codex_api_port, &other.codex_api_port);
-        merge_option(&mut self.codex_api_scheme, &other.codex_api_scheme);
+        merge_option(&mut self.lpad_api_port, &other.lpad_api_port);
+        merge_option(&mut self.lpad_api_scheme, &other.lpad_api_scheme);
         merge_option(
             &mut self.discover_ollama_models,
             &other.discover_ollama_models,
         );
-        merge_option(&mut self.codex_args, &other.codex_args);
+        merge_option(&mut self.lpad_args, &other.lpad_args);
         merge_option(&mut self.working_directory, &other.working_directory);
         merge_option(&mut self.failover, &other.failover);
         if other.profiles.is_some() {
@@ -270,33 +280,33 @@ impl LauncherConfig {
         non_empty(&self.api_key).filter(|value| value != "replace-with-your-api-key")
     }
 
-    pub fn codex_args(&self) -> Vec<String> {
-        self.codex_args.clone().unwrap_or_default()
+    pub fn lpad_args(&self) -> Vec<String> {
+        self.lpad_args.clone().unwrap_or_default()
     }
 
-    pub fn persist_codex_config(&self) -> bool {
-        self.persist_codex_config.unwrap_or(true)
+    pub fn lpad_persist_config(&self) -> bool {
+        self.lpad_persist_config.unwrap_or(true)
     }
 
-    pub fn codex_model(&self) -> Option<String> {
-        non_empty(&self.codex_model)
+    pub fn lpad_model(&self) -> Option<String> {
+        non_empty(&self.lpad_model)
     }
 
     pub fn discover_ollama_models(&self) -> bool {
         self.discover_ollama_models.unwrap_or(true)
     }
 
-    pub fn codex_provider_id(&self) -> String {
-        non_empty(&self.codex_provider_id).unwrap_or_else(|| "codex-launchpad".to_string())
+    pub fn lpad_provider_id(&self) -> String {
+        non_empty(&self.lpad_provider_id).unwrap_or_else(|| "launchpadx".to_string())
     }
 
-    pub fn codex_provider_name(&self) -> String {
-        non_empty(&self.codex_provider_name)
+    pub fn lpad_provider_name(&self) -> String {
+        non_empty(&self.lpad_provider_name)
             .unwrap_or_else(|| crate::branding::DEFAULT_PROVIDER_NAME.to_string())
     }
 
-    pub fn codex_api_key_mode(&self) -> ApiKeyMode {
-        self.codex_api_key_mode
+    pub fn lpad_api_key_mode(&self) -> ApiKeyMode {
+        self.lpad_api_key_mode
             .unwrap_or(ApiKeyMode::ExperimentalBearerToken)
     }
 
@@ -308,19 +318,19 @@ impl LauncherConfig {
         non_empty(&self.codex_command).map(|value| expand_env_vars(&value))
     }
 
-    pub fn codex_api_port(&self) -> u16 {
-        self.codex_api_port.unwrap_or(4000)
+    pub fn lpad_api_port(&self) -> u16 {
+        self.lpad_api_port.unwrap_or(4000)
     }
 
-    pub fn codex_api_scheme(&self) -> String {
-        non_empty(&self.codex_api_scheme).unwrap_or_else(|| "http".to_string())
+    pub fn lpad_api_scheme(&self) -> String {
+        non_empty(&self.lpad_api_scheme).unwrap_or_else(|| "http".to_string())
     }
 
     pub fn codex_api_base_url(&self) -> String {
         format!(
             "{}://127.0.0.1:{}",
-            self.codex_api_scheme(),
-            self.codex_api_port()
+            self.lpad_api_scheme(),
+            self.lpad_api_port()
         )
     }
 
@@ -429,16 +439,70 @@ mod tests {
             .collect::<HashSet<_>>();
 
         assert!(
-            parsed.codex_api_port.is_some(),
-            "config.example.json should include codexApiPort"
+            parsed.lpad_api_port.is_some(),
+            "config.example.json should include codexApiPort or lpadApiPort"
         );
         assert!(
-            parsed.codex_api_scheme.is_some(),
-            "config.example.json should include codexApiScheme"
+            parsed.lpad_api_scheme.is_some(),
+            "config.example.json should include codexApiScheme or lpadApiScheme"
         );
         assert!(
             keys.contains("openaiBaseUrl"),
             "config.example.json should include openaiBaseUrl"
         );
+        assert!(
+            keys.contains("codexModel"),
+            "config.example.json should include codexModel"
+        );
+    }
+
+    #[test]
+    fn ui_config_field_names_round_trip() {
+        let ui_json = r#"{
+            "codexModel": "llama3.2",
+            "persistCodexConfig": true,
+            "codexProviderId": "launchpadx",
+            "codexProviderName": "Local Ollama",
+            "codexApiKeyMode": "experimentalBearerToken",
+            "codexApiPort": 4000,
+            "codexApiScheme": "http",
+            "codexArgs": ["--foo"]
+        }"#;
+        let parsed: LauncherConfig =
+            serde_json::from_str(ui_json).expect("UI config JSON should parse");
+        assert_eq!(parsed.lpad_model.as_deref(), Some("llama3.2"));
+        assert_eq!(parsed.lpad_persist_config, Some(true));
+        assert_eq!(parsed.lpad_provider_id.as_deref(), Some("launchpadx"));
+        assert_eq!(parsed.lpad_api_port, Some(4000));
+        assert_eq!(
+            parsed.lpad_args.as_deref(),
+            Some(&["--foo".to_string()][..])
+        );
+
+        let serialized = serde_json::to_value(&parsed).expect("config should serialize");
+        assert_eq!(
+            serialized.get("codexModel").and_then(|v| v.as_str()),
+            Some("llama3.2")
+        );
+        assert_eq!(
+            serialized
+                .get("persistCodexConfig")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn legacy_lpad_field_aliases_still_parse() {
+        let legacy_json = r#"{
+            "lpadModel": "qwen2.5",
+            "lpadApiPort": 4001,
+            "lpadPersistConfig": false
+        }"#;
+        let parsed: LauncherConfig =
+            serde_json::from_str(legacy_json).expect("legacy config JSON should parse");
+        assert_eq!(parsed.lpad_model.as_deref(), Some("qwen2.5"));
+        assert_eq!(parsed.lpad_api_port, Some(4001));
+        assert_eq!(parsed.lpad_persist_config, Some(false));
     }
 }

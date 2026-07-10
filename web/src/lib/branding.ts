@@ -1,4 +1,7 @@
-export const APP_NAME = "Codex Launchpad";
+export const APP_NAME = "LaunchPadX";
+export const APP_TAGLINE = "Codex endpoint launcher";
+/** OpenAI Codex desktop app that LaunchPadX configures and launches. */
+export const TARGET_APP_NAME = "Codex";
 export const ORG_NAME = "Carapace LLC";
 export const COPYRIGHT_YEAR = 2026;
 export const LICENSE_NAME = "MIT License";
@@ -8,8 +11,8 @@ export const ORG_TAGLINE = `A ${ORG_NAME} community project`;
 export const ORG_WEBSITE = "https://carapaceai.org";
 export const ORG_DISCORD = "https://carapaceai.org/discord";
 export const ORG_PATREON = "https://carapaceai.org/patreon";
-export const ORG_GITHUB = "https://github.com/CarapaceUDE/codex-launchpad";
-export const OFFICIAL_BUILDS_URL = `${ORG_GITHUB}/blob/master/OFFICIAL_BUILDS.md`;
+export const ORG_GITHUB = "https://github.com/CarapaceUDE/launchpadx";
+export const RELEASES_URL = `${ORG_GITHUB}/releases`;
 // Served by the embedded HTTP server (works offline and while the GitHub repo is private).
 export const LICENSE_URL = "/LICENSE";
 export const SECURITY_URL = `${ORG_GITHUB}/blob/master/SECURITY.md`;

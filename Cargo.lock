@@ -427,25 +427,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codex-launchpad"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs",
- "image",
- "reqwest",
- "rfd",
- "serde",
- "serde_json",
- "tao",
- "thiserror 1.0.69",
- "tiny_http",
- "tokio",
- "toml_edit 0.22.27",
- "wry",
-]
-
-[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1655,6 +1636,25 @@ dependencies = [
  "indexmap 1.9.3",
  "matches",
  "selectors",
+]
+
+[[package]]
+name = "launchpadx"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "image",
+ "reqwest",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tao",
+ "thiserror 1.0.69",
+ "tiny_http",
+ "tokio",
+ "toml_edit 0.22.27",
+ "wry",
 ]
 
 [[package]]

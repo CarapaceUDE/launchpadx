@@ -18,7 +18,7 @@ test.describe.configure({ mode: "serial" });
 test.describe("Codex provider mode", () => {
   test.beforeEach(async () => {
     fs.writeFileSync(codexFixture, seedToml, "utf8");
-    const backupDir = path.join(__dirname, "fixtures", "backups", "codex-launchpad");
+    const backupDir = path.join(__dirname, "fixtures", "backups", "launchpadx");
     if (fs.existsSync(backupDir)) {
       fs.rmSync(backupDir, { recursive: true, force: true });
     }
@@ -43,7 +43,7 @@ test.describe("Codex provider mode", () => {
     });
 
     const written = fs.readFileSync(codexFixture, "utf8");
-    expect(written).toContain('model_provider = "codex-launchpad"');
+    expect(written).toContain('model_provider = "launchpadx"');
     expect(written).toContain('model = "llama3.2"');
     expect(written).toContain("experimental_bearer_token");
   });
@@ -70,7 +70,7 @@ test.describe("Codex provider mode", () => {
       .toContain('model = "gpt-test"');
     await expect
       .poll(() => fs.readFileSync(codexFixture, "utf8"))
-      .not.toContain("codex-launchpad");
+      .not.toContain("launchpadx");
   });
 
   test("switches back to codex account after local api", async ({ page }) => {
@@ -82,14 +82,14 @@ test.describe("Codex provider mode", () => {
     await page.getByTestId("provider-activate-codex").click();
     await page.getByTestId("provider-confirm-switch").click();
 
-    await expect(page.getByTestId("provider-mode-status")).toContainText(/account sign-in|openai/i, {
+    await expect(page.getByTestId("provider-mode-status")).toContainText(/cloud account|account sign-in|openai/i, {
       timeout: 15_000,
     });
 
     const restored = fs.readFileSync(codexFixture, "utf8");
     expect(restored).toContain('model_provider = "openai"');
     expect(restored).toContain('model = "gpt-test"');
-    expect(restored).not.toContain("codex-launchpad");
+    expect(restored).not.toContain("launchpadx");
   });
 
   test("model selection stays valid in the dropdown", async ({ page }) => {

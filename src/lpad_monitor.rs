@@ -8,13 +8,11 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::json;
 
-use crate::codex_process::{CodexProcess, CodexProcessInfo};
 use crate::config::LauncherConfig;
-use crate::connection_watch::{
-    self, ConnectionAlert, ConnectionAlertKind, EndpointHealth,
-};
-use crate::codex_app_server;
+use crate::connection_watch::{self, ConnectionAlert, ConnectionAlertKind, EndpointHealth};
 use crate::failover::{self, APP_SERVER_RATE_LIMIT_SOURCE};
+use crate::lpad_app_server;
+use crate::lpad_process::{CodexProcess, CodexProcessInfo};
 use crate::rate_limit_watch;
 use crate::session_checkpoint::{self, ProviderModeKind, SessionCheckpoint};
 
@@ -139,8 +137,7 @@ impl CodexMonitor {
         self.status.connection_log_hint = connection_discovery_hint();
 
         let process = crate::app_logic::detect_codex_process(&config, &self.root);
-        let codex_api_ready =
-            process.running && crate::app_logic::codex_api_ready(&config);
+        let codex_api_ready = process.running && crate::app_logic::codex_api_ready(&config);
 
         self.poll_connection_health(&config, &process, provider_mode, codex_api_ready);
 
@@ -156,7 +153,6 @@ impl CodexMonitor {
                 provider_mode == ProviderModeKind::CodexAccount,
             );
         }
-
     }
 
     fn poll_connection_health(
@@ -168,13 +164,12 @@ impl CodexMonitor {
     ) {
         self.status.codex_api_ready = codex_api_ready;
 
-        let endpoint_health = if provider_mode == ProviderModeKind::LocalApi
-            || self.poll_count.is_multiple_of(2)
-        {
-            Some(connection_watch::probe_endpoint_health(config))
-        } else {
-            None
-        };
+        let endpoint_health =
+            if provider_mode == ProviderModeKind::LocalApi || self.poll_count.is_multiple_of(2) {
+                Some(connection_watch::probe_endpoint_health(config))
+            } else {
+                None
+            };
 
         if let Some(ref health) = endpoint_health {
             self.status.endpoint_health = Some(health.clone());
@@ -282,7 +277,7 @@ impl CodexMonitor {
             return;
         }
 
-        let status = codex_app_server::read_rate_limits(config);
+        let status = lpad_app_server::read_rate_limits(config);
         let signature = rate_limits_poll_signature(&status);
         if self.last_rate_limits_poll_signature.as_deref() != Some(signature.as_str()) {
             self.last_rate_limits_poll_signature = Some(signature);
@@ -294,8 +289,8 @@ impl CodexMonitor {
                     "ok": status.ok,
                     "error": status.error,
                     "planType": status.plan_type,
-                    "rateLimitReachedType": codex_app_server::rate_limit_reached_type(&status),
-                    "snippet": codex_app_server::rate_limit_status_snippet(&status),
+                    "rateLimitReachedType": lpad_app_server::rate_limit_reached_type(&status),
+                    "snippet": lpad_app_server::rate_limit_status_snippet(&status),
                     "rateLimits": status.rate_limits,
                 }),
             );
@@ -309,7 +304,7 @@ impl CodexMonitor {
                 matched_pattern: reached_type,
                 source: APP_SERVER_RATE_LIMIT_SOURCE.to_string(),
                 session_id: None,
-                snippet: codex_app_server::rate_limit_status_snippet(&status),
+                snippet: lpad_app_server::rate_limit_status_snippet(&status),
                 dismissed: false,
             };
 
@@ -341,16 +336,19 @@ impl CodexMonitor {
             return;
         }
 
-        if self.status.active_alert.as_ref().is_some_and(|alert| {
-            alert.source == APP_SERVER_RATE_LIMIT_SOURCE && !alert.dismissed
-        }) {
+        if self
+            .status
+            .active_alert
+            .as_ref()
+            .is_some_and(|alert| alert.source == APP_SERVER_RATE_LIMIT_SOURCE && !alert.dismissed)
+        {
             self.dismiss_alert();
             rate_limit_watch::log_event(
                 Some(self.root.as_path()),
                 "INFO",
                 "rate_limit_cleared",
                 json!({
-                    "snippet": codex_app_server::rate_limit_status_snippet(&status),
+                    "snippet": lpad_app_server::rate_limit_status_snippet(&status),
                 }),
             );
         }
@@ -550,9 +548,14 @@ impl CodexMonitor {
     }
 
     fn push_connection_alert(&mut self, alert: ConnectionAlert) {
-        if self.status.active_connection_alert.as_ref().is_some_and(|existing| {
-            existing.kind == alert.kind && existing.message == alert.message
-        }) {
+        if self
+            .status
+            .active_connection_alert
+            .as_ref()
+            .is_some_and(|existing| {
+                existing.kind == alert.kind && existing.message == alert.message
+            })
+        {
             return;
         }
 
@@ -562,29 +565,29 @@ impl CodexMonitor {
     }
 }
 
-fn rate_limits_poll_signature(status: &codex_app_server::CodexRateLimitsStatus) -> String {
+fn rate_limits_poll_signature(status: &lpad_app_server::CodexRateLimitsStatus) -> String {
     format!(
         "{}|{}|{}|{}",
         status.ok,
         status.error.as_deref().unwrap_or(""),
-        codex_app_server::rate_limit_reached_type(status).unwrap_or_default(),
-        codex_app_server::rate_limit_status_snippet(status),
+        lpad_app_server::rate_limit_reached_type(status).unwrap_or_default(),
+        lpad_app_server::rate_limit_status_snippet(status),
     )
 }
 
 fn rate_limit_discovery_hint() -> String {
     let home = dirs::home_dir()
-        .map(|path| path.join(".codex-launchpad/discovery/rate-limit.jsonl"))
+        .map(|path| path.join(".launchpadx/discovery/rate-limit.jsonl"))
         .map(|path| path.display().to_string())
-        .unwrap_or_else(|| "~/.codex-launchpad/discovery/rate-limit.jsonl".to_string());
+        .unwrap_or_else(|| "~/.launchpadx/discovery/rate-limit.jsonl".to_string());
     format!("Also mirrored in app.log. Persistent copy: {home}")
 }
 
 fn connection_discovery_hint() -> String {
     let home = dirs::home_dir()
-        .map(|path| path.join(".codex-launchpad/discovery/connection.jsonl"))
+        .map(|path| path.join(".launchpadx/discovery/connection.jsonl"))
         .map(|path| path.display().to_string())
-        .unwrap_or_else(|| "~/.codex-launchpad/discovery/connection.jsonl".to_string());
+        .unwrap_or_else(|| "~/.launchpadx/discovery/connection.jsonl".to_string());
     format!("Also mirrored in app.log. Persistent copy: {home}")
 }
 

@@ -1,5 +1,6 @@
 import { AlertTriangle, Copy, X } from "lucide-react";
 import type { FailoverAlert, SessionCheckpoint } from "../../types";
+import { TARGET_APP_NAME } from "../../lib/branding";
 
 export function FailoverBanner({
   alert,
@@ -27,12 +28,12 @@ export function FailoverBanner({
         <div className="min-w-0 flex-1 space-y-2">
           <div>
             <p className="text-sm font-semibold text-foreground">
-              Codex account limit detected
+              Cloud account limit detected
             </p>
             <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
               {alert.source === "app_server_rate_limits"
-                ? `Codex app-server reports ${alert.matchedPattern} via account/rateLimits/read. Switch to your local provider, restart Codex, and resume with the saved context.`
-                : `Matched "${alert.matchedPattern}". Switch to your configured local profile, restart Codex, and resume with the saved context.`}
+                ? `App-server reports ${alert.matchedPattern} via account/rateLimits/read. Switch to your local provider, restart ${TARGET_APP_NAME}, and resume with the saved context.`
+                : `Matched "${alert.matchedPattern}". Switch to your configured local profile, restart ${TARGET_APP_NAME}, and resume with the saved context.`}
             </p>
             {alert.snippet ? (
               <p className="mt-2 truncate rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5 text-[12px] text-foreground/80">

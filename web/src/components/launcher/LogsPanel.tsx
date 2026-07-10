@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
-import { useLauncher, type LogEntry } from "../../context/LauncherContext";
+import { useLaunchPadX, type LogEntry } from "../../context/LaunchPadXContext";
 
 function isWatchLog(message: string) {
   return message.includes("RATE_LIMIT_WATCH") || message.includes("CONNECTION_WATCH");
@@ -35,7 +35,7 @@ function levelBg(level: string, message: string) {
 }
 
 export function LogsPanel() {
-  const { getAppLogs } = useLauncher();
+  const { getAppLogs } = useLaunchPadX();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [loading, setLoading] = useState(false);

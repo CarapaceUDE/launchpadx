@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 
-use crate::codex_app_server::{self, CodexRateLimitsStatus};
 use crate::config::{FailoverSettings, LauncherConfig, ProfileOverlay};
+use crate::lpad_app_server::{self, CodexRateLimitsStatus};
 use crate::session_checkpoint::{self, SessionCheckpoint};
 
 pub const APP_SERVER_RATE_LIMIT_SOURCE: &str = "app_server_rate_limits";
@@ -25,11 +25,11 @@ pub fn matches_rate_limit(text: &str, patterns: &[String]) -> Option<String> {
 }
 
 pub fn rate_limit_reached_from_status(status: &CodexRateLimitsStatus) -> Option<String> {
-    codex_app_server::rate_limit_reached_type(status)
+    lpad_app_server::rate_limit_reached_type(status)
 }
 
 pub fn should_failover_for_rate_limits(status: &CodexRateLimitsStatus) -> bool {
-    status.ok && codex_app_server::is_rate_limit_reached(status)
+    status.ok && lpad_app_server::is_rate_limit_reached(status)
 }
 
 pub fn local_overlay_from_config(config: &LauncherConfig) -> ProfileOverlay {
@@ -39,10 +39,10 @@ pub fn local_overlay_from_config(config: &LauncherConfig) -> ProfileOverlay {
         ollama_port: config.ollama_port,
         ollama_scheme: config.ollama_scheme.clone(),
         api_key: config.api_key.clone(),
-        codex_model: config.codex_model.clone(),
-        codex_provider_id: Some(config.codex_provider_id()),
-        codex_provider_name: Some(config.codex_provider_name()),
-        codex_api_key_mode: Some(config.codex_api_key_mode()),
+        lpad_model: config.lpad_model.clone(),
+        lpad_provider_id: Some(config.lpad_provider_id()),
+        lpad_provider_name: Some(config.lpad_provider_name()),
+        lpad_api_key_mode: Some(config.lpad_api_key_mode()),
         working_directory: config.working_directory.clone(),
     }
 }
@@ -67,22 +67,25 @@ pub fn resolve_fallback_profile(
         }
     }
 
-    if config.ollama_ip.as_ref().is_some_and(|value| !value.trim().is_empty())
+    if config
+        .ollama_ip
+        .as_ref()
+        .is_some_and(|value| !value.trim().is_empty())
         || config
             .openai_base_url
             .as_ref()
             .is_some_and(|value| !value.trim().is_empty())
     {
-        return Ok(("launcher-local".to_string(), local_overlay_from_config(config)));
+        return Ok((
+            "launcher-local".to_string(),
+            local_overlay_from_config(config),
+        ));
     }
 
     Err("No local endpoint is configured in this launcher's settings yet.".into())
 }
 
-pub fn apply_profile_overlay(
-    base: &LauncherConfig,
-    overlay: &ProfileOverlay,
-) -> LauncherConfig {
+pub fn apply_profile_overlay(base: &LauncherConfig, overlay: &ProfileOverlay) -> LauncherConfig {
     let mut next = base.clone();
     overlay.apply_to(&mut next);
     next
@@ -149,11 +152,7 @@ pub fn capture_checkpoint_from_running(
             .block_on(client.get_response(&session.session_id))
             .ok();
         let assistant = response.as_ref().map(|msg| msg.content.clone());
-        (
-            Some(session.session_id.clone()),
-            None,
-            assistant,
-        )
+        (Some(session.session_id.clone()), None, assistant)
     } else {
         (None, None, None)
     };
@@ -178,7 +177,7 @@ pub fn capture_checkpoint_from_running(
         session_id,
         working_directory: working_directory.map(|path| path.display().to_string()),
         provider_mode: session_checkpoint::provider_mode_from_config(config),
-        model: config.codex_model(),
+        model: config.lpad_model(),
         active_goal,
         last_user_message,
         last_assistant_summary,
@@ -210,7 +209,7 @@ pub fn probe_codex_api(config: &LauncherConfig) -> serde_json::Value {
         "codexApiBaseUrl": base_url,
         "healthOk": health_ok,
         "restSessionsSupported": health_ok,
-        "appServerWebSocketUrl": format!("ws://127.0.0.1:{}/", config.codex_api_port()),
+        "appServerWebSocketUrl": format!("ws://127.0.0.1:{}/", config.lpad_api_port()),
         "notes": [
             "REST /sessions is wired for checkpoint capture and legacy text discovery logging.",
             "Auto-failover uses account/rateLimits/read rateLimitReachedType from codex app-server.",
@@ -244,10 +243,10 @@ mod tests {
             error: None,
             requires_auth: Some(false),
             plan_type: Some("plus".to_string()),
-            rate_limits: Some(codex_app_server::CodexRateLimits {
+            rate_limits: Some(lpad_app_server::CodexRateLimits {
                 limit_id: Some("codex".to_string()),
                 limit_name: None,
-                primary: Some(codex_app_server::RateLimitWindow {
+                primary: Some(lpad_app_server::RateLimitWindow {
                     used_percent: Some(100),
                     window_duration_mins: Some(300),
                     resets_at: Some(1),
@@ -267,9 +266,9 @@ mod tests {
         );
 
         let exhausted_without_signal = CodexRateLimitsStatus {
-            rate_limits: Some(codex_app_server::CodexRateLimits {
+            rate_limits: Some(lpad_app_server::CodexRateLimits {
                 rate_limit_reached_type: None,
-                primary: Some(codex_app_server::RateLimitWindow {
+                primary: Some(lpad_app_server::RateLimitWindow {
                     used_percent: Some(100),
                     window_duration_mins: Some(300),
                     resets_at: Some(1),

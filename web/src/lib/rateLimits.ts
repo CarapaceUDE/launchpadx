@@ -107,7 +107,7 @@ export function buildUsageViews(status?: CodexRateLimitsStatus | null): WindowUs
 export function compactUsageLine(status?: CodexRateLimitsStatus | null): string | null {
     const views = buildUsageViews(status);
     if (views.length === 0) {
-        if (status?.requiresAuth) return "Sign in to Codex CLI";
+        if (status?.requiresAuth) return "Sign in to cloud CLI";
         if (status?.error) return "Usage unavailable";
         return null;
     }

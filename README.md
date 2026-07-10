@@ -1,23 +1,23 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="Codex Launchpad" width="360" />
+<img src="assets/logo.png" alt="LaunchPadX" width="360" />
 
-# Codex Launchpad
+# LaunchPadX
 
 **Point [Codex](https://github.com/openai/codex) at any OpenAI-compatible API and manage providers, models, and launch settings from one desktop app.**
 
-[![CI](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml/badge.svg)](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml)
+[![CI](https://github.com/CarapaceUDE/launchpadx/actions/workflows/ci.yml/badge.svg)](https://github.com/CarapaceUDE/launchpadx/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=plastic&labelColor=555555)](LICENSE)
-[![Official builds](https://img.shields.io/badge/Official%20builds-Patreon-f96854?style=plastic&labelColor=555555&logo=patreon&logoColor=white)](https://carapaceai.org/patreon)
+[![Release](https://img.shields.io/github/v/release/CarapaceUDE/launchpadx?style=plastic&labelColor=555555)](https://github.com/CarapaceUDE/launchpadx/releases/latest)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-f97316?style=plastic&labelColor=555555&logo=rust&logoColor=white)](https://rustup.rs/)
 [![React](https://img.shields.io/badge/UI-React-61dafb?style=plastic&labelColor=555555&logo=react&logoColor=black)](web/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-2563eb?style=plastic&labelColor=555555)]()
 
-[**Website**](https://carapaceai.org) · [**Patreon — official builds**](https://carapaceai.org/patreon) · [**Discord**](https://carapaceai.org/discord) · [**Issues**](https://github.com/CarapaceUDE/codex-launchpad/issues)
+[**Website**](https://carapaceai.org) · [**Downloads**](https://github.com/CarapaceUDE/launchpadx/releases) · [**Discord**](https://carapaceai.org/discord) · [**Issues**](https://github.com/CarapaceUDE/launchpadx/issues)
 
 <br />
 
-<img src="assets/readme-screenshot.png" alt="Codex Launchpad showing Local API provider selection and model picker" width="920" />
+<img src="assets/readme-screenshot.png" alt="LaunchPadX showing Local API provider selection and model picker" width="920" />
 
 <sub>Switch between Codex cloud sign-in and any OpenAI-compatible <code>/v1</code> endpoint, pick a model, and launch.</sub>
 
@@ -49,15 +49,11 @@
 
 | What | License / terms | How to get it |
 | ---- | --------------- | ------------- |
-| **Source code** | [MIT License](LICENSE) — free for everyone | This repository |
-| **Official binaries** | [Official build terms](OFFICIAL_BUILDS.md) — personal use, no redistribution | [Patreon supporters](https://carapaceai.org/patreon) |
-| **Self-built binary** | MIT (you compiled from source) | [Build instructions](#quick-start-gui) below |
+| **Source code** | [MIT License](LICENSE) | This repository |
+| **Release binaries** | [MIT License](LICENSE) | [GitHub Releases](https://github.com/CarapaceUDE/launchpadx/releases) |
+| **Self-built binary** | [MIT License](LICENSE) | [Build instructions](#quick-start-gui) below |
 
-**Why Patreon for official builds?** Carapace is early-stage and needs supporter revenue to keep building. The source is fully open under MIT, so anyone can compile and run the app for free. Official pre-built binaries are a convenience for [Patreon supporters](https://carapaceai.org/patreon) while we grow.
-
-During this phase, that split is intentional—it doubles as an early-access filter. While things are still rough, we'd rather surface bugs through people who build from source and are comfortable debugging setup: developer-minded early testers who file useful issues and contribute fixes. That keeps us learning from actionable feedback instead of drowning in "it just broke" reports from users who downloaded a binary and expected polish on day one. Once the project is sustainable, publishing builds on [GitHub Releases](https://github.com/CarapaceUDE/codex-launchpad/releases) becomes a priority — but not yet.
-
-Whether you build from source or support us on Patreon, we're happy to offer **limited community support** on our [Discord server](https://carapaceai.org/discord) — setup questions, build trouble, and bug reports are welcome there.
+Release binaries are built from the tagged commit by GitHub Actions on Windows, macOS, and Linux. This makes the build inputs and logs visible alongside the source. Community support is available on our [Discord server](https://carapaceai.org/discord).
 
 ---
 
@@ -80,7 +76,7 @@ The project targets **Windows, macOS, and Linux**. You can build on any of them 
 
 ## Quick Start (GUI)
 
-**Official builds:** download the latest binary from [Patreon](https://carapaceai.org/patreon).
+**Pre-built releases:** download the latest archive from [GitHub Releases](https://github.com/CarapaceUDE/launchpadx/releases/latest).
 
 **From source:** build and run locally (works on any supported OS):
 
@@ -94,10 +90,10 @@ The project targets **Windows, macOS, and Linux**. You can build on any of them 
    ```sh
    cd web && npm ci && npm run build && cd ..
    cargo build --release
-   ./target/release/codex-launchpad --gui
+   ./target/release/launchpadx --gui
    ```
 
-   On Windows the binary is `target\release\codex-launchpad.exe`. If `web/dist/` is missing, `cargo build` runs `npm ci` (when `web/node_modules` is absent) and then `npm run build` via `build.rs`. You can still run `cd web && npm ci` yourself first — that is the most reliable path on a fresh clone.
+   On Windows the binary is `target\release\launchpadx.exe`. If `web/dist/` is missing, `cargo build` runs `npm ci` (when `web/node_modules` is absent) and then `npm run build` via `build.rs`. You can still run `cd web && npm ci` yourself first — that is the most reliable path on a fresh clone.
 
    **Windows shortcut:** `.\run-gui.cmd` runs a stale-build check and launches the release GUI — convenience only, not required.
 
@@ -120,28 +116,28 @@ cd web && npm ci && npm run build && cd ..
 cargo build --release
 
 # Run the CLI (same binary as the GUI)
-./target/release/codex-launchpad --config config.json
+./target/release/launchpadx --config config.json
 ```
 
-The binary lives at `target/debug/codex-launchpad` (debug) or `target/release/codex-launchpad` (release). Add `.exe` on Windows.
+The binary lives at `target/debug/launchpadx` (debug) or `target/release/launchpadx` (release). Add `.exe` on Windows.
 
 ### Common CLI commands
 
 ```sh
-codex-launchpad --refresh-models          # discover and cache models
-codex-launchpad --list-models             # print cached models
-codex-launchpad --write-config-only       # write ~/.codex/config.toml only
-codex-launchpad --launch                  # apply config and launch Codex
-codex-launchpad --restore                 # restore previous Codex settings
-codex-launchpad --diagnose                # setup and connectivity checks
-codex-launchpad --help                    # full flag list
+launchpadx --refresh-models          # discover and cache models
+launchpadx --list-models             # print cached models
+launchpadx --write-config-only       # write ~/.codex/config.toml only
+launchpadx --launch                  # apply config and launch Codex
+launchpadx --restore                 # restore previous Codex settings
+launchpadx --diagnose                # setup and connectivity checks
+launchpadx --help                    # full flag list
 ```
 
 Pass `--config path/to/config.json` when not running from the repo root.
 
 ### Windows helper scripts (optional)
 
-PowerShell wrappers in `scripts/` mirror the CLI flags above (`run-cli.ps1`, `refresh-models.ps1`, `restore.ps1`, `launch-codex.ps1`). They are **Windows-only conveniences** — the `codex-launchpad` binary is the portable interface.
+PowerShell wrappers in `scripts/` mirror the CLI flags above (`run-cli.ps1`, `refresh-models.ps1`, `restore.ps1`, `launch-codex.ps1`). They are **Windows-only conveniences** — the `launchpadx` binary is the portable interface.
 
 ## Config
 
@@ -189,7 +185,7 @@ Optional shell wrappers mirror the same steps:
 | Script | Platform | Purpose |
 | ------ | -------- | ------- |
 | `scripts/build.sh` / `./build.sh` | macOS, Linux, Git Bash | `npm ci` + web build + `cargo build --bins` |
-| `codex-launchpad --build-check` | All platforms | Timestamp-based incremental rebuild + staging |
+| `launchpadx --build-check` | All platforms | Timestamp-based incremental rebuild + staging |
 | `build-check.sh` / `build-check.ps1` | All (thin wrappers) | Run `--build-check` |
 
 ### Cross-compilation
@@ -201,7 +197,7 @@ rustup target add aarch64-unknown-linux-gnu   # example
 cargo build --release --target aarch64-unknown-linux-gnu
 ```
 
-Output: `target/<triple>/release/codex-launchpad`. You need the appropriate linker and sysroot for the destination OS. The [Build Official Binaries](.github/workflows/build-official-binaries.yml) workflow shows the target triples we ship (Windows, macOS x86_64/arm64, Linux x86_64/arm64).
+Output: `target/<triple>/release/launchpadx`. You need the appropriate linker and sysroot for the destination OS. The [release workflow](.github/workflows/release.yml) builds one native archive for each supported OS.
 
 ### Optional convenience scripts
 
@@ -210,18 +206,18 @@ Cross-platform logic lives in the Rust binary and `build.rs`. These wrappers are
 | Script | Platform | Purpose |
 | ------ | -------- | ------- |
 | `build.sh` / `scripts/build.sh` | Unix, Git Bash | Full build (web + Rust) |
-| `codex-launchpad --build-check` | All platforms | Incremental rebuild + staging |
+| `launchpadx --build-check` | All platforms | Incremental rebuild + staging |
 | `build-check.sh` / `build-check.ps1` | All (thin wrappers) | Run `--build-check` |
 | `build.cmd` / `scripts/build.ps1` | Windows | `cargo build --bins` |
-| `run-gui.cmd` | Windows | Build if stale, then `codex-launchpad --gui` |
+| `run-gui.cmd` | Windows | Build if stale, then `launchpadx --gui` |
 | `test.cmd` | Windows | `cargo fmt --check`, `cargo test`, `cargo clippy` |
-| `diagnose.sh` / `diagnose.ps1` | All (thin wrappers) | Run `codex-launchpad --diagnose` |
+| `diagnose.sh` / `diagnose.ps1` | All (thin wrappers) | Run `launchpadx --diagnose` |
 
-Stuck on a build or platform-specific dependency? Run `codex-launchpad --diagnose` first, then ask on [Discord](https://carapaceai.org/discord) — we provide limited community support there and are glad to help when we can.
+Stuck on a build or platform-specific dependency? Run `launchpadx --diagnose` first, then ask on [Discord](https://carapaceai.org/discord) — we provide limited community support there and are glad to help when we can.
 
 ## Testing
 
-The **CI** badge runs [GitHub Actions](https://github.com/CarapaceUDE/codex-launchpad/actions/workflows/ci.yml) on every push to `master`: it checks Rust formatting, runs Clippy lints, and executes unit tests. It does not build release binaries (those are distributed via [Patreon](https://carapaceai.org/patreon) for now).
+The **CI** badge runs [GitHub Actions](https://github.com/CarapaceUDE/launchpadx/actions/workflows/ci.yml) on every push to `master`: it checks Rust formatting, runs Clippy lints, and executes unit tests. Version tags trigger the separate cross-platform [release workflow](.github/workflows/release.yml).
 
 ```sh
 cargo fmt -- --check
@@ -234,9 +230,9 @@ On Windows, `.\test.cmd` runs the same three commands.
 ## Diagnostics
 
 ```sh
-codex-launchpad --diagnose                # config, Codex launch probe, endpoint + API checks
-codex-launchpad --health
-codex-launchpad --list-models
+launchpadx --diagnose                # config, Codex launch probe, endpoint + API checks
+launchpadx --health
+launchpadx --list-models
 ```
 
 `./diagnose.sh` and `.\diagnose.ps1` are thin wrappers around `--diagnose` (they run the built binary, or `cargo run` if you have not built yet).
@@ -251,7 +247,6 @@ To report a security vulnerability, see [SECURITY.md](SECURITY.md). Please do no
 
 Source code is licensed under the [MIT License](LICENSE). Copyright (c) 2026 Carapace LLC.
 
-Official pre-built binaries are distributed separately under the [Official Build terms](OFFICIAL_BUILDS.md).
 
 ## Trademark
 
@@ -277,11 +272,11 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 │   ├── refresh-models.ps1
 │   └── restore.ps1
 ├── build.sh              # Unix/Git Bash → scripts/build.sh
-├── build-check.ps1       # Thin wrapper → codex-launchpad --build-check
+├── build-check.ps1       # Thin wrapper → launchpadx --build-check
 ├── build.rs              # Cargo build script (auto-builds web UI on all OSes)
 ├── launch-codex.ps1      # Windows Codex launcher wrapper
-├── diagnose.sh           # Unix/Git Bash → codex-launchpad --diagnose
-├── diagnose.ps1          # Windows → codex-launchpad --diagnose
+├── diagnose.sh           # Unix/Git Bash → launchpadx --diagnose
+├── diagnose.ps1          # Windows → launchpadx --diagnose
 ├── config.example.json   # Public config template
 ├── config.json           # Local config (gitignored)
 ├── run-gui.cmd           # Windows: build + launch GUI
@@ -298,5 +293,4 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security policy](SECURITY.md)
 - [License](LICENSE)
-- [Official build terms](OFFICIAL_BUILDS.md)
 - [Release process](docs/release-process.md)

@@ -65,7 +65,7 @@ pub fn checkpoints_dir() -> Result<PathBuf, std::io::Error> {
     let home = dirs::home_dir().ok_or_else(|| {
         std::io::Error::new(std::io::ErrorKind::NotFound, "home directory not found")
     })?;
-    let dir = home.join(".codex-launchpad").join("checkpoints");
+    let dir = home.join(".launchpadx").join("checkpoints");
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
@@ -73,9 +73,8 @@ pub fn checkpoints_dir() -> Result<PathBuf, std::io::Error> {
 pub fn save_checkpoint(checkpoint: &SessionCheckpoint) -> Result<PathBuf, std::io::Error> {
     let dir = checkpoints_dir()?;
     let path = dir.join(format!("{}.json", checkpoint.id));
-    let data = serde_json::to_string_pretty(checkpoint).map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-    })?;
+    let data = serde_json::to_string_pretty(checkpoint)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     fs::write(&path, data)?;
     Ok(path)
 }
@@ -109,9 +108,8 @@ pub fn load_checkpoint(id: &str) -> Result<Option<SessionCheckpoint>, std::io::E
         return Ok(None);
     }
     let data = fs::read_to_string(path)?;
-    let mut checkpoint: SessionCheckpoint = serde_json::from_str(&data).map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-    })?;
+    let mut checkpoint: SessionCheckpoint = serde_json::from_str(&data)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
     if checkpoint.resume_prompt.is_empty() {
         checkpoint.resume_prompt = checkpoint.build_resume_prompt();
     }
@@ -158,7 +156,7 @@ pub fn detect_goal_from_text(text: &str) -> Option<String> {
 }
 
 pub fn provider_mode_from_config(config: &LauncherConfig) -> ProviderModeKind {
-    if crate::codex_config::inspect(config)
+    if crate::lpad_config::inspect(config)
         .map(|inspection| inspection.managed_by_launcher)
         .unwrap_or(false)
     {

@@ -1,9 +1,9 @@
 use crate::app_logic;
-use crate::codex_monitor::{CodexMonitor, spawn_monitor};
-use crate::codex_process;
 use crate::config::LauncherConfig;
 use crate::failover;
 use crate::launcher;
+use crate::lpad_monitor::{spawn_monitor, CodexMonitor};
+use crate::lpad_process;
 use crate::session_checkpoint;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
@@ -436,7 +436,7 @@ pub fn launch_web_gui(
     gui_log!(Some(root.as_path()), "INFO", "Window shown");
 
     gui_log!(Some(root.as_path()), "INFO", "Running event loop");
-    let _pid_file = codex_process::CodexProcess::spawn_pid_file_path(&root);
+    let _pid_file = lpad_process::CodexProcess::spawn_pid_file_path(&root);
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -555,7 +555,7 @@ fn config_with_overlay(
                 || cfg.openai_base_url.is_some()
                 || cfg.ollama_port.is_some()
                 || cfg.ollama_scheme.is_some()
-                || cfg.codex_model.is_some()
+                || cfg.lpad_model.is_some()
         }
     });
 
@@ -595,7 +595,7 @@ fn rpc_launch(state: &RpcState, params: serde_json::Value) -> serde_json::Value 
             || cfg.openai_base_url.is_some()
             || cfg.ollama_port.is_some()
             || cfg.ollama_scheme.is_some()
-            || cfg.codex_model.is_some()
+            || cfg.lpad_model.is_some()
     });
     let config = if has_overlay {
         match LauncherConfig::read(&state.config_path) {
@@ -616,7 +616,7 @@ fn rpc_launch(state: &RpcState, params: serde_json::Value) -> serde_json::Value 
     if let Err(e) = app_logic::write_config_for_launch(&config) {
         return serde_json::json!({"error": e.to_string()});
     }
-    let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+    let pid_file = lpad_process::CodexProcess::spawn_pid_file_path(&state.root);
     let launch_target = match launcher::resolve(&config) {
         Ok(target) => target.to_string(),
         Err(e) => return serde_json::json!({"error": e.to_string()}),
@@ -634,7 +634,7 @@ fn rpc_stop(state: &RpcState) -> serde_json::Value {
         Ok(c) => c,
         Err(e) => return serde_json::json!({"error": format!("Cannot read config: {}", e)}),
     };
-    let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+    let pid_file = lpad_process::CodexProcess::spawn_pid_file_path(&state.root);
     match app_logic::stop_codex(&config, &state.root, &pid_file) {
         Ok(msg) => serde_json::json!({"ok": true, "message": msg}),
         Err(e) => serde_json::json!({"error": e.to_string()}),
@@ -849,18 +849,11 @@ fn rpc_failover_to_local(state: &RpcState, params: serde_json::Value) -> serde_j
         Ok(config) => config,
         Err(error) => return serde_json::json!({"error": error.to_string()}),
     };
-    let profile_name = params
-        .get("profileName")
-        .and_then(|value| value.as_str());
-    let pid_file = codex_process::CodexProcess::spawn_pid_file_path(&state.root);
+    let profile_name = params.get("profileName").and_then(|value| value.as_str());
+    let pid_file = lpad_process::CodexProcess::spawn_pid_file_path(&state.root);
 
-    match failover::run_manual_failover(
-        &config,
-        &state.root,
-        &pid_file,
-        profile_name,
-        "manual_ui",
-    ) {
+    match failover::run_manual_failover(&config, &state.root, &pid_file, profile_name, "manual_ui")
+    {
         Ok(result) => {
             if let Some(checkpoint) = result.checkpoint.clone() {
                 if let Ok(mut monitor) = state.monitor.lock() {
@@ -880,7 +873,10 @@ fn rpc_failover_to_local(state: &RpcState, params: serde_json::Value) -> serde_j
     }
 }
 
-fn rpc_capture_session_checkpoint(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+fn rpc_capture_session_checkpoint(
+    state: &RpcState,
+    params: serde_json::Value,
+) -> serde_json::Value {
     let config = match LauncherConfig::read(&state.config_path) {
         Ok(config) => config,
         Err(error) => return serde_json::json!({"error": error.to_string()}),
@@ -914,12 +910,15 @@ fn rpc_list_codex_threads(state: &RpcState, params: serde_json::Value) -> serde_
         Ok(config) => config,
         Err(error) => return serde_json::json!({"error": error}),
     };
-    let status = crate::codex_app_server::list_threads(&config);
+    let status = crate::lpad_app_server::list_threads(&config);
     serde_json::to_value(status)
         .unwrap_or_else(|error| serde_json::json!({"error": error.to_string()}))
 }
 
-fn rpc_list_codex_sessions_detailed(state: &RpcState, params: serde_json::Value) -> serde_json::Value {
+fn rpc_list_codex_sessions_detailed(
+    state: &RpcState,
+    params: serde_json::Value,
+) -> serde_json::Value {
     let config = match config_for_request(state, &params) {
         Ok(config) => config,
         Err(error) => return serde_json::json!({"error": error}),
@@ -988,7 +987,7 @@ fn rpc_get_codex_rate_limits(state: &RpcState, params: serde_json::Value) -> ser
         Ok(config) => config,
         Err(error) => return serde_json::json!({"error": error}),
     };
-    let status = crate::codex_app_server::read_rate_limits(&config);
+    let status = crate::lpad_app_server::read_rate_limits(&config);
     serde_json::to_value(status)
         .unwrap_or_else(|error| serde_json::json!({"error": error.to_string()}))
 }
