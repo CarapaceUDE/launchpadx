@@ -1,6 +1,6 @@
 [package]
 name = "launchpadx"
-version = "0.2.0"
+version = "0.2.1"
 repository = "https://github.com/CarapaceUDE/launchpadx"
 edition = "2021"
 description = "Desktop launcher to point Codex at any OpenAI-compatible API."

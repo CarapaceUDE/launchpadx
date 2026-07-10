@@ -127,8 +127,10 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           package="$BINARY_NAME-$TAG-$TARGET"
-          mkdir "$package"
-          cp "target/$TARGET/release/$BINARY_NAME" README.md LICENSE "$package/"
+          mkdir -p "$package/web" "$package/assets"
+          cp "target/$TARGET/release/$BINARY_NAME" README.md LICENSE config.example.json "$package/"
+          cp -R web/dist "$package/web/dist"
+          cp assets/icon.png "$package/assets/icon.png"
           tar -czf "$package.tar.gz" "$package"
         shell: bash
 
@@ -140,10 +142,43 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           package="$BINARY_NAME-$TAG-$TARGET"
-          mkdir "$package"
-          cp "target/$TARGET/release/$BINARY_NAME.exe" README.md LICENSE "$package/"
+          mkdir -p "$package/web" "$package/assets"
+          cp "target/$TARGET/release/$BINARY_NAME.exe" README.md LICENSE config.example.json "$package/"
+          cp -R web/dist "$package/web/dist"
+          cp assets/icon.png "$package/assets/icon.png"
           7z a "$package.zip" "./$package/*"
         shell: bash
+
+      - name: Smoke-test packaged web UI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          $package = "$env:BINARY_NAME-$env:TAG-$env:TARGET"
+          $process = Start-Process -FilePath "$package/$env:BINARY_NAME.exe" `
+            -ArgumentList "--serve-only", "--port", "4173" `
+            -WorkingDirectory $package -PassThru -WindowStyle Hidden
+          try {
+            $response = $null
+            for ($attempt = 0; $attempt -lt 20; $attempt++) {
+              Start-Sleep -Milliseconds 500
+              if ($process.HasExited) {
+                throw "Packaged executable exited before serving the UI (code $($process.ExitCode))"
+              }
+              try {
+                $response = Invoke-WebRequest -Uri "http://127.0.0.1:4173" -UseBasicParsing
+                break
+              } catch {}
+            }
+            if (-not $response -or $response.StatusCode -ne 200 -or $response.Content -notmatch '<div id="root">') {
+              throw "Packaged executable did not serve the web UI"
+            }
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
 
       - name: Upload directly to draft release
         env:

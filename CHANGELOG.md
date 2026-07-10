@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-07-10
+
+### Fixed
+- Double-clicking the executable now opens the GUI instead of printing CLI help and exiting.
+- Release archives now include the built web UI and app icon required at runtime.
+- Windows release packaging now smoke-tests the archived layout before publishing.
+
 ## [0.2.0] — 2026-07-10
 
 ### Changed

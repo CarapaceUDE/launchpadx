@@ -31,6 +31,15 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    // A desktop release is normally started by double-clicking the executable.
+    // Keep CLI actions explicit, but make the no-argument path open the GUI.
+    if !args.has_explicit_action() {
+        let root = launchpadx::web_backend::resolve_gui_root();
+        let config_path = default_config_path(&root);
+        launchpadx::web_backend::launch_web_gui(root, config_path)?;
+        return Ok(());
+    }
+
     if args.diagnose {
         let root = std::env::current_dir()?;
         let config_path = args
@@ -61,11 +70,6 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
         .unwrap_or(std::env::current_dir()?);
-
-    if !args.has_explicit_action() {
-        print_help();
-        return Ok(());
-    }
 
     if !args.unknown_args.is_empty() {
         return Err(format!(
