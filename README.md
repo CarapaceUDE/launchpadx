@@ -34,6 +34,12 @@
 
 Found a bug? [Open a bug report](https://github.com/CarapaceUDE/launchpadx/issues/new?template=bug_report.md) and include the shortest reliable steps needed to reproduce it.
 
+## Join the Community
+
+**[Join the CarapaceAI Discord →](https://carapaceai.org/discord)**
+
+Meet other LaunchPadX users, share compatible endpoints and setups, ask questions, and follow project updates. For reproducible bugs and feature requests, please continue to use [GitHub Issues](https://github.com/CarapaceUDE/launchpadx/issues) so details remain searchable and actionable.
+
 ## Features
 
 - **Dual provider modes** — Codex cloud account or route through any OpenAI-compatible API (vLLM, LiteLLM, OpenRouter, your own gateway, etc.)
@@ -47,6 +53,7 @@ Found a bug? [Open a bug report](https://github.com/CarapaceUDE/launchpadx/issue
 
 - [Distribution](#distribution)
 - [Quick Start](#quick-start)
+- [Join the community](#join-the-community)
 - [Build from source](#build-from-source-gui)
 - [CLI usage](#cli-usage-headless--automation)
 - [Config](#config)
