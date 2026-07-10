@@ -46,6 +46,12 @@ pub fn resolve_gui_root() -> PathBuf {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(exe) = std::env::current_exe() {
+        #[cfg(target_os = "macos")]
+        if let Some(contents_dir) = exe.parent().and_then(Path::parent) {
+            // A Finder-installed .app keeps runtime assets in Contents/Resources.
+            candidates.push(contents_dir.join("Resources"));
+        }
+
         let mut dir = exe.parent().map(|p| p.to_path_buf());
         for _ in 0..6 {
             if let Some(ref d) = dir {

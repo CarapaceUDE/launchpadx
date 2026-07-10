@@ -28,8 +28,8 @@
 
 ## Quick Start
 
-1. **[Download the latest release](https://github.com/CarapaceUDE/launchpadx/releases/latest)** for Windows, macOS, or Linux.
-2. Extract the archive and run `launchpadx` (`launchpadx.exe` on Windows).
+1. **[Download the latest release](https://github.com/CarapaceUDE/launchpadx/releases/latest)** for Windows x64, macOS (Apple Silicon or Intel), or Linux x64.
+2. Extract the archive and run `launchpadx.exe` on Windows, `LaunchPadX.app` on macOS, or `./launchpadx` on Linux.
 3. Open **Settings**, enter your OpenAI-compatible endpoint and API-key settings, choose a model, then launch Codex from **Home**.
 
 Found a bug? [Open a bug report](https://github.com/CarapaceUDE/launchpadx/issues/new?template=bug_report.md) and include the shortest reliable steps needed to reproduce it.
@@ -73,6 +73,11 @@ Meet other LaunchPadX users, share compatible endpoints and setups, ask question
 | **Self-built binary** | [MIT License](LICENSE) | [Build instructions](#build-from-source-gui) below |
 
 Release binaries are built from the tagged commit by GitHub Actions on Windows, macOS, and Linux. This makes the build inputs and logs visible alongside the source. Community support is available on our [Discord server](https://carapaceai.org/discord).
+
+### Platform notes
+
+- **macOS:** the universal archive supports Apple Silicon and Intel. Builds are ad-hoc signed but not yet Apple-notarized, so on first launch Control-click `LaunchPadX.app`, choose **Open**, then confirm **Open**. Routine double-click launch works afterward.
+- **Linux:** the archive targets x86_64 distributions with GTK 3 and WebKitGTK 4.1. On Ubuntu/Debian, install runtime libraries with `sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libayatana-appindicator3-1 librsvg2-2` if they are not already present.
 
 ---
 

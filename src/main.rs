@@ -21,7 +21,9 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.gui {
         let root = launchpadx::web_backend::resolve_gui_root();
-        let config_path = args.config_path.unwrap_or_else(|| root.join("config.json"));
+        let config_path = args
+            .config_path
+            .unwrap_or_else(|| default_gui_config_path(&root));
         launchpadx::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
     }
@@ -35,7 +37,7 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
     // Keep CLI actions explicit, but make the no-argument path open the GUI.
     if !args.has_explicit_action() {
         let root = launchpadx::web_backend::resolve_gui_root();
-        let config_path = default_config_path(&root);
+        let config_path = default_gui_config_path(&root);
         launchpadx::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
     }
@@ -225,6 +227,20 @@ fn default_config_path(root: &Path) -> PathBuf {
     } else {
         PathBuf::from("config.json")
     }
+}
+
+fn default_gui_config_path(root: &Path) -> PathBuf {
+    let packaged_config = root.join("config.json");
+    if packaged_config.exists() {
+        return packaged_config;
+    }
+
+    #[cfg(target_os = "macos")]
+    if let Some(config_dir) = dirs::config_dir() {
+        return config_dir.join("launchpadx").join("config.json");
+    }
+
+    root.join("config.json")
 }
 
 fn print_help() {

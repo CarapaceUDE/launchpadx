@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-07-10
+
+### Fixed
+- macOS releases are now universal binaries for both Apple Silicon and Intel Macs and include a Finder-launchable app bundle.
+- Linux and macOS release packages now run a portable web UI smoke test before publishing.
+- Linux release jobs now verify dynamic libraries and launch the packaged GUI under a virtual display.
+
 ## [0.2.1] — 2026-07-10
 
 ### Fixed

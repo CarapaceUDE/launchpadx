@@ -24,7 +24,7 @@ export function AboutPanel() {
         </div>
         <h3 className="text-[16px] font-semibold text-foreground">{APP_NAME}</h3>
         <p className="text-[12px] text-muted-foreground">{ORG_TAGLINE}</p>
-        <p className="text-[12px] text-muted-foreground">Version 0.2.1</p>
+        <p className="text-[12px] text-muted-foreground">Version 0.2.2</p>
       </div>
 
       <div className="mt-4 space-y-2">
