@@ -1,6 +1,6 @@
 [package]
 name = "launchpadx"
-version = "0.2.2"
+version = "0.2.3"
 repository = "https://github.com/CarapaceUDE/launchpadx"
 edition = "2021"
 description = "Desktop launcher to point Codex at any OpenAI-compatible API."
@@ -23,3 +23,4 @@ chrono = { version = "0.4", features = ["serde"] }
 
 [features]
 default = []
+desktop = []

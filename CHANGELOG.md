@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-07-10
+
+### Fixed
+- Windows GUI releases no longer open or retain a console window.
+- Windows executables now embed the LaunchPadX icon and version metadata.
+- Windows archives include a separate `launchpadx-cli.exe` for console commands.
+- Release automation can Authenticode-sign both executables through Azure Artifact Signing or a trusted PFX when signing credentials are configured.
+
 ## [0.2.2] — 2026-07-10
 
 ### Fixed

@@ -14,6 +14,25 @@ on:
         required: false
         default: launchpadx
         type: string
+    secrets:
+      WINDOWS_CERTIFICATE_BASE64:
+        description: Base64-encoded trusted Authenticode PFX certificate
+        required: false
+      WINDOWS_CERTIFICATE_PASSWORD:
+        description: Password for the Authenticode PFX certificate
+        required: false
+      AZURE_CLIENT_ID:
+        required: false
+      AZURE_TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      AZURE_ARTIFACT_SIGNING_ENDPOINT:
+        required: false
+      AZURE_ARTIFACT_SIGNING_ACCOUNT:
+        required: false
+      AZURE_ARTIFACT_SIGNING_PROFILE:
+        required: false
   workflow_dispatch:
     inputs:
       tag:
@@ -31,6 +50,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
@@ -85,6 +105,8 @@ jobs:
             extension: ""
             archive: tar.gz
     runs-on: ${{ matrix.os }}
+    env:
+      ARTIFACT_SIGNING_ENDPOINT: ${{ secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,10 +137,21 @@ jobs:
           key: ${{ matrix.target }}
 
       - name: Build release binary
-        if: runner.os != 'macOS'
+        if: runner.os == 'Linux'
         env:
           BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
         run: cargo build --locked --release --bin "$BINARY_NAME" --target ${{ matrix.target }}
+        shell: bash
+
+      - name: Build Windows GUI and CLI executables
+        if: runner.os == 'Windows'
+        env:
+          BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo build --locked --release --bin "$BINARY_NAME" --target "$TARGET"
+          cp "target/$TARGET/release/$BINARY_NAME.exe" "target/$TARGET/release/$BINARY_NAME-cli.exe"
+          cargo build --locked --release --bin "$BINARY_NAME" --target "$TARGET" --features desktop
         shell: bash
 
       - name: Build universal macOS binary
@@ -215,11 +248,97 @@ jobs:
         run: |
           package="$BINARY_NAME-$TAG-$TARGET"
           mkdir -p "$package/web" "$package/assets"
-          cp "target/$TARGET/release/$BINARY_NAME.exe" README.md LICENSE config.example.json "$package/"
+          cp "target/$TARGET/release/$BINARY_NAME.exe" "target/$TARGET/release/$BINARY_NAME-cli.exe" README.md LICENSE config.example.json "$package/"
           cp -R web/dist "$package/web/dist"
           cp assets/icon.png "$package/assets/icon.png"
           7z a "$package.zip" "./$package/*"
         shell: bash
+
+      - name: Sign in to Azure for Artifact Signing
+        if: runner.os == 'Windows' && env.ARTIFACT_SIGNING_ENDPOINT != ''
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign Windows executables with Azure Artifact Signing
+        if: runner.os == 'Windows' && env.ARTIFACT_SIGNING_ENDPOINT != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\${{ inputs['binary-name'] || 'launchpadx' }}-${{ needs.prepare.outputs.tag }}-${{ matrix.target }}
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Sign Windows executables when certificate is configured
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          ARTIFACT_SIGNING_ENDPOINT: ${{ secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
+            if (-not [string]::IsNullOrWhiteSpace($env:ARTIFACT_SIGNING_ENDPOINT)) {
+              Write-Output "Executables were signed with Azure Artifact Signing."
+              exit 0
+            }
+            Write-Warning "WINDOWS_CERTIFICATE_BASE64 is not configured; publishing unsigned Windows executables."
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "launchpadx-signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+          $package = "$env:BINARY_NAME-$env:TAG-$env:TARGET"
+          try {
+            foreach ($file in @("$package/$env:BINARY_NAME.exe", "$package/$env:BINARY_NAME-cli.exe")) {
+              & signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $pfx /p $env:CERTIFICATE_PASSWORD $file
+              if ($LASTEXITCODE -ne 0) { throw "signtool failed for $file" }
+              & signtool verify /pa /v $file
+              if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $file" }
+            }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Verify configured Windows signatures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ARTIFACT_SIGNING_ENDPOINT: ${{ secrets.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ARTIFACT_SIGNING_ENDPOINT) -and [string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
+            Write-Warning "No trusted Windows signing method is configured."
+            exit 0
+          }
+          $package = "$env:BINARY_NAME-$env:TAG-$env:TARGET"
+          foreach ($file in @("$package/$env:BINARY_NAME.exe", "$package/$env:BINARY_NAME-cli.exe")) {
+            $signature = Get-AuthenticodeSignature $file
+            if ($signature.Status -ne "Valid") { throw "Invalid Authenticode signature for $file: $($signature.Status)" }
+          }
+
+      - name: Repack signed Windows archive
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          package="$BINARY_NAME-$TAG-$TARGET"
+          rm "$package.zip"
+          7z a "$package.zip" "./$package/*"
 
       - name: Smoke-test packaged web UI
         if: runner.os == 'Windows'
@@ -230,6 +349,23 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           $package = "$env:BINARY_NAME-$env:TAG-$env:TARGET"
+          $gui = Resolve-Path "$package/$env:BINARY_NAME.exe"
+          $cli = Resolve-Path "$package/$env:BINARY_NAME-cli.exe"
+          function Get-PeSubsystem([string]$path) {
+            $bytes = [IO.File]::ReadAllBytes($path)
+            $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+            return [BitConverter]::ToUInt16($bytes, $peOffset + 92)
+          }
+          if ((Get-PeSubsystem $gui) -ne 2) { throw "GUI executable is not a Windows GUI-subsystem binary" }
+          if ((Get-PeSubsystem $cli) -ne 3) { throw "CLI executable is not a console-subsystem binary" }
+          $version = (Get-Item $gui).VersionInfo
+          if ($version.ProductName -ne "LaunchPadX" -or $version.CompanyName -ne "Carapace LLC") {
+            throw "Windows version metadata is missing"
+          }
+          Add-Type -AssemblyName System.Drawing
+          if (-not [Drawing.Icon]::ExtractAssociatedIcon($gui)) { throw "Windows executable icon is missing" }
+          $help = (& $cli --help | Out-String)
+          if ($help -notmatch "LaunchPadX" -or $help -notmatch "USAGE") { throw "Packaged CLI output is broken" }
           $process = Start-Process -FilePath "$package/$env:BINARY_NAME.exe" `
             -ArgumentList "--serve-only", "--port", "4173" `
             -WorkingDirectory $package -PassThru -WindowStyle Hidden

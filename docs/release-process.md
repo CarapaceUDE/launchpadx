@@ -10,6 +10,8 @@ LaunchPadX uses one GitHub Actions workflow to build and publish native Windows,
 
 The workflow uses only GitHub's built-in `GITHUB_TOKEN`; no release secret is required.
 
+Windows releases are unsigned unless a trusted signing method is configured. See [Windows code signing](windows-signing.md) for Azure Artifact Signing setup and the PFX alternative.
+
 ## Ship a version
 
 1. Make sure CI is green on `master`.

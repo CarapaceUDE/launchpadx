@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(target_os = "windows", feature = "desktop"),
+    windows_subsystem = "windows"
+)]
+
 use std::path::{Path, PathBuf};
 
 fn main() {

@@ -87,10 +87,10 @@ pub fn resolve_gui_root() -> PathBuf {
 
 fn icon_candidates_for(root: &Path) -> Vec<PathBuf> {
     vec![
-        root.join("assets").join(ICON_FILENAME),
         root.join("assets").join(ICON_PNG),
-        root.join(ICON_FILENAME),
+        root.join("assets").join(ICON_FILENAME),
         root.join(ICON_PNG),
+        root.join(ICON_FILENAME),
     ]
 }
 

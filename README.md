@@ -78,6 +78,8 @@ Release binaries are built from the tagged commit by GitHub Actions on Windows, 
 
 - **macOS:** the universal archive supports Apple Silicon and Intel. Builds are ad-hoc signed but not yet Apple-notarized, so on first launch Control-click `LaunchPadX.app`, choose **Open**, then confirm **Open**. Routine double-click launch works afterward.
 - **Linux:** the archive targets x86_64 distributions with GTK 3 and WebKitGTK 4.1. On Ubuntu/Debian, install runtime libraries with `sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libayatana-appindicator3-1 librsvg2-2` if they are not already present.
+- **Windows CLI:** use `launchpadx-cli.exe` for command-line operations. `launchpadx.exe` is the desktop build and intentionally has no console window.
+- **Windows trust warning:** builds remain unsigned until a trusted Authenticode certificate is configured. A self-signed certificate does not remove SmartScreen warnings for public users.
 
 ---
 
@@ -316,3 +318,4 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 - [Security policy](SECURITY.md)
 - [License](LICENSE)
 - [Release process](docs/release-process.md)
+- [Windows code signing](docs/windows-signing.md)
