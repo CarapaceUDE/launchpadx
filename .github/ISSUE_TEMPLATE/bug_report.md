@@ -6,10 +6,11 @@ labels: ["bug"]
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+A concise description of what went wrong.
 
 **Steps to reproduce**
-1. 
+List the shortest reliable sequence that triggers the problem:
+1.
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
@@ -19,10 +20,11 @@ A clear and concise description of what actually happened.
 
 **Environment**
 - OS: [e.g. Windows 11, macOS 14, Ubuntu 22.04]
-- Launcher version: [e.g. 0.1.0, or commit SHA]
+- LaunchPadX version: [e.g. 0.2.0, or commit SHA]
+- Endpoint software/provider and version, if relevant:
 
 **Logs**
-Paste any relevant log output or reference the error log location.
+Paste relevant log output or reference the error log location. Remove API keys, tokens, and other secrets first.
 
 **Additional context**
 Add any other context about the problem here.

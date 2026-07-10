@@ -6,12 +6,12 @@ Security fixes are provided for the latest release on the default branch.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.1.x   | Yes       |
-| < 0.1   | No        |
+| 0.2.x   | Yes       |
+| < 0.2   | No        |
 
 ## Reporting a Vulnerability
 
-Please report security vulnerabilities privately to **security@carapaceai.org**.
+Please report security vulnerabilities privately to **[carapaceai@gmail.com](mailto:carapaceai@gmail.com)**.
 
 Include:
 

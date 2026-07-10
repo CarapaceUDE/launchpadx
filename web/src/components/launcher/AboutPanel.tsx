@@ -6,9 +6,9 @@ import {
   LICENSE_URL,
   ORG_DISCORD,
   ORG_GITHUB,
-  ORG_PATREON,
   ORG_TAGLINE,
   ORG_WEBSITE,
+  ISSUES_URL,
   RELEASES_URL,
   TRADEMARK_NOTICE,
 } from "../../lib/branding";
@@ -84,11 +84,15 @@ export function AboutPanel() {
             and are built automatically from each tagged source version.
           </p>
           <p>
-            Patreon is primarily a way to support the project — you do not need
-            it to use {APP_NAME}. The source is always free and open.
-          </p>
-          <p>
-            Prefer to build from source? Join our{" "}
+            Found a bug? Please file a concise report with reproduction steps on{" "}
+            <a
+              href={ISSUES_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
+              GitHub Issues
+            </a>. For setup help, join our{" "}
             <a
               href={ORG_DISCORD}
               target="_blank"

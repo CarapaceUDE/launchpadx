@@ -10,9 +10,9 @@ export const LICENSE_NOTICE = `${LICENSE_NAME} · ${COPYRIGHT_NOTICE}`;
 export const ORG_TAGLINE = `A ${ORG_NAME} community project`;
 export const ORG_WEBSITE = "https://carapaceai.org";
 export const ORG_DISCORD = "https://carapaceai.org/discord";
-export const ORG_PATREON = "https://carapaceai.org/patreon";
 export const ORG_GITHUB = "https://github.com/CarapaceUDE/launchpadx";
 export const RELEASES_URL = `${ORG_GITHUB}/releases`;
+export const ISSUES_URL = `${ORG_GITHUB}/issues`;
 // Served by the embedded HTTP server (works offline and while the GitHub repo is private).
 export const LICENSE_URL = "/LICENSE";
 export const SECURITY_URL = `${ORG_GITHUB}/blob/master/SECURITY.md`;

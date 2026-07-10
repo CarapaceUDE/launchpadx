@@ -23,6 +23,17 @@
 
 </div>
 
+> [!WARNING]
+> **LaunchPadX is an early release and has not yet been thoroughly tested across every system and endpoint.** Expect rough edges, bugs, or issues we have not caught. Please report problems through [GitHub Issues](https://github.com/CarapaceUDE/launchpadx/issues/new/choose) with concise reproduction steps, your OS and LaunchPadX version, expected versus actual behavior, and relevant logs with secrets removed.
+
+## Quick Start
+
+1. **[Download the latest release](https://github.com/CarapaceUDE/launchpadx/releases/latest)** for Windows, macOS, or Linux.
+2. Extract the archive and run `launchpadx` (`launchpadx.exe` on Windows).
+3. Open **Settings**, enter your OpenAI-compatible endpoint and API-key settings, choose a model, then launch Codex from **Home**.
+
+Found a bug? [Open a bug report](https://github.com/CarapaceUDE/launchpadx/issues/new?template=bug_report.md) and include the shortest reliable steps needed to reproduce it.
+
 ## Features
 
 - **Dual provider modes** — Codex cloud account or route through any OpenAI-compatible API (vLLM, LiteLLM, OpenRouter, your own gateway, etc.)
@@ -35,7 +46,8 @@
 ## Contents
 
 - [Distribution](#distribution)
-- [Quick Start](#quick-start-gui)
+- [Quick Start](#quick-start)
+- [Build from source](#build-from-source-gui)
 - [CLI usage](#cli-usage-headless--automation)
 - [Config](#config)
 - [Build system](#build-system)
@@ -51,7 +63,7 @@
 | ---- | --------------- | ------------- |
 | **Source code** | [MIT License](LICENSE) | This repository |
 | **Release binaries** | [MIT License](LICENSE) | [GitHub Releases](https://github.com/CarapaceUDE/launchpadx/releases) |
-| **Self-built binary** | [MIT License](LICENSE) | [Build instructions](#quick-start-gui) below |
+| **Self-built binary** | [MIT License](LICENSE) | [Build instructions](#build-from-source-gui) below |
 
 Release binaries are built from the tagged commit by GitHub Actions on Windows, macOS, and Linux. This makes the build inputs and logs visible alongside the source. Community support is available on our [Discord server](https://carapaceai.org/discord).
 
@@ -74,11 +86,9 @@ Release binaries are built from the tagged commit by GitHub Actions on Windows, 
 
 The project targets **Windows, macOS, and Linux**. You can build on any of them for the host OS. Cross-compiling for another OS is supported via `rustup target add` + `cargo build --target <triple>` (see [Build system](#build-system)).
 
-## Quick Start (GUI)
+## Build from Source (GUI)
 
-**Pre-built releases:** download the latest archive from [GitHub Releases](https://github.com/CarapaceUDE/launchpadx/releases/latest).
-
-**From source:** build and run locally (works on any supported OS):
+Build and run locally on any supported OS:
 
 1. **Copy and edit the config:**
    ```sh

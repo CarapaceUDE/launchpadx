@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Renamed the application to LaunchPadX and clarified that it launches Codex against OpenAI-compatible endpoints, not only local models.
 - Added public Windows, macOS, and Linux release archives built from tags by GitHub Actions.
-- Removed generated compiler probes, runtime discovery logs, obsolete helper scripts, and the Patreon-only binary distribution policy.
+- Removed generated compiler probes, runtime discovery logs, obsolete helper scripts, and the old restricted binary distribution policy.
 - Fixed `run-gui.cmd` / `--build-check` invoking a stale release binary that ignored the flag and tried to launch Codex instead of building.
 - `launchpadx` with no arguments now prints help instead of auto-launching Codex; use `--launch` explicitly.
 - Launch no longer errors when Codex is already running — it reports the detected process and leaves it alone.
