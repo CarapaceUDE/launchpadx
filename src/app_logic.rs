@@ -4,6 +4,7 @@ use crate::launcher::{self, LaunchTarget};
 use crate::lpad_config;
 use crate::lpad_process::{CodexProcess, CodexProcessInfo, ProcessState};
 use crate::ollama;
+#[cfg(windows)]
 use crate::process_util;
 use std::error::Error;
 use std::fs;
