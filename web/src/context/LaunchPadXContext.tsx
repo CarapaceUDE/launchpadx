@@ -841,14 +841,28 @@ export function LaunchPadXProvider({ children }: { children: ReactNode }) {
       const message = (payload as { message?: string }).message ?? `${TARGET_APP_NAME} stopped.`;
       const healthResult = await window.codexRPC.healthCheck(configRef.current);
       const health = unwrap(healthResult);
+      const stillRunning = health.running ?? false;
       applyHealth(
-        health.running ?? false,
+        stillRunning,
         health.apiReady ?? false,
         health.endpointReady ?? false,
         true,
       );
+      if (stillRunning) {
+        operationRef.current = "idle";
+        setState((prev) => ({
+          ...prev,
+          operation: "idle",
+          statusMessage:
+            `${TARGET_APP_NAME} is still running after stop. Close it manually or try again.`,
+          statusVariant: "error",
+        }));
+        return;
+      }
+      operationRef.current = "idle";
       setState((prev) => ({
         ...prev,
+        operation: "idle",
         statusMessage: message,
         statusVariant: "success",
       }));

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-07-11
+
+### Fixed
+- Windows GUI no longer flashes `tasklist` and other console windows while polling Codex health.
+- Stop Codex now kills multi-process and Store installs, verifies shutdown, and reports failure when Codex is still running.
+
 ## [0.2.3] — 2026-07-10
 
 ### Fixed

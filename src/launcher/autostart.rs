@@ -1,7 +1,7 @@
 #[cfg(not(target_os = "windows"))]
 use std::fs;
 use std::path::PathBuf;
-#[cfg(any(target_os = "windows", target_os = "macos"))]
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 use thiserror::Error;
@@ -39,7 +39,7 @@ pub fn enable_auto_start() -> Result<(), AutoStartError> {
         binary_path
     );
 
-    let output = Command::new("powershell.exe")
+    let output = crate::process_util::command("powershell.exe")
         .args(["-NoProfile", "-Command", &script])
         .output()
         .map_err(|e| AutoStartError::Registration(e.to_string()))?;
@@ -57,7 +57,7 @@ pub fn disable_auto_start() -> Result<(), AutoStartError> {
     // Use PowerShell to remove registry key
     let script = r#"Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "CodexLocalLauncher" -ErrorAction SilentlyContinue"#;
 
-    let _output = Command::new("powershell.exe")
+    let _output = crate::process_util::command("powershell.exe")
         .args(["-NoProfile", "-Command", script])
         .output()
         .map_err(|e| AutoStartError::Registration(e.to_string()))?;
