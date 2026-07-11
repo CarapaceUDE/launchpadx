@@ -14,7 +14,7 @@ pub fn command(program: impl AsRef<OsStr>) -> Command {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         let mut cmd = Command::new(program);
         cmd.creation_flags(CREATE_NO_WINDOW);
-        return cmd;
+        cmd
     }
     #[cfg(not(windows))]
     {
