@@ -272,7 +272,7 @@ impl CodexProcess {
 
         #[cfg(target_os = "windows")]
         {
-            let result = Command::new("taskkill")
+            let result = crate::process_util::command("taskkill")
                 .args(["/F", "/T", "/PID", &pid.to_string()])
                 .output();
 

@@ -15,6 +15,7 @@ pub mod lpad_monitor;
 pub mod lpad_process;
 pub mod lpad_thread_store;
 pub mod ollama;
+pub mod process_util;
 pub mod rate_limit_watch;
 pub mod session_checkpoint;
 pub mod session_monitor;

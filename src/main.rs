@@ -135,12 +135,12 @@ fn run_cli_sync(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if args.kill {
-        match launchpadx::app_logic::kill_codex_by_pid(&pid_file) {
+        match launchpadx::app_logic::stop_codex(&config, &root, &pid_file) {
             Ok(msg) => {
                 println!("{}", msg);
             }
             Err(e) => {
-                eprintln!("Failed to kill Codex: {e}");
+                eprintln!("Failed to stop Codex: {e}");
                 std::process::exit(1);
             }
         }

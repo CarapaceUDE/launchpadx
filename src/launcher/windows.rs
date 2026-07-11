@@ -3,6 +3,8 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
+use crate::process_util;
+
 use super::{common_path_commands, find_on_path, first_existing, LaunchTarget, LauncherError};
 
 pub fn resolve() -> Result<LaunchTarget, LauncherError> {
@@ -73,7 +75,7 @@ $apps = Get-StartApps | Where-Object {
 }
 $apps | Select-Object -First 1 -ExpandProperty AppID
 "#;
-    let output = Command::new("powershell.exe")
+    let output = process_util::command("powershell.exe")
         .args(["-NoProfile", "-Command", script])
         .output()
         .ok()?;
@@ -86,7 +88,7 @@ $apps | Select-Object -First 1 -ExpandProperty AppID
 
 fn launch_via_powershell(target: &str) -> bool {
     let script = format!("Start-Process -FilePath '{}'", target.replace('\'', "''"));
-    Command::new("powershell.exe")
+    process_util::command("powershell.exe")
         .args(["-NoProfile", "-Command", &script])
         .spawn()
         .is_ok()
@@ -107,7 +109,7 @@ pub fn wait_for_codex_process(timeout_secs: u64) -> bool {
 }
 
 pub fn codex_process_visible() -> bool {
-    let Ok(output) = Command::new("tasklist")
+    let Ok(output) = process_util::command("tasklist")
         .args(["/FO", "CSV", "/NH"])
         .output()
     else {
@@ -212,7 +214,7 @@ pub fn is_blocked_windowsapps_cli(path: &Path) -> bool {
 }
 
 fn discover_via_where(command: &str) -> Vec<PathBuf> {
-    let output = match Command::new("where.exe").arg(command).output() {
+    let output = match process_util::command("where.exe").arg(command).output() {
         Ok(output) if output.status.success() => output,
         _ => return Vec::new(),
     };
