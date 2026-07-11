@@ -8,9 +8,9 @@ use crate::process_util;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 #[cfg(not(target_os = "windows"))]
 use std::process::Command;
+use std::time::Duration;
 
 pub fn default_config_path(root: &Path) -> PathBuf {
     let packaged_config = root.join("config.json");
@@ -214,7 +214,10 @@ pub fn kill_codex_by_pid(pid_file: &Path) -> Result<String, Box<dyn Error>> {
 }
 
 fn codex_stop_pid_files(root: &Path, pid_file: &Path) -> Vec<PathBuf> {
-    let mut paths = vec![pid_file.to_path_buf(), CodexProcess::spawn_pid_file_path(root)];
+    let mut paths = vec![
+        pid_file.to_path_buf(),
+        CodexProcess::spawn_pid_file_path(root),
+    ];
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             let exe_pid = parent.join(".codex.pid");
