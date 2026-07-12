@@ -1,5 +1,5 @@
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Stdio};
 use std::thread;
 use std::time::Duration;
 
@@ -168,7 +168,7 @@ struct AppServerClient {
 
 impl AppServerClient {
     fn spawn(cli: &str) -> Result<Self, AppServerError> {
-        let mut child = Command::new(cli)
+        let mut child = crate::process_util::command(cli)
             .args(["app-server", "--listen", "stdio://"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

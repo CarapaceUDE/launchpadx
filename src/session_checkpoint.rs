@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -125,7 +124,7 @@ pub fn delete_checkpoint(id: &str) -> Result<(), std::io::Error> {
 }
 
 pub fn git_branch_for(working_directory: &Path) -> Option<String> {
-    let output = Command::new("git")
+    let output = crate::process_util::command("git")
         .args(["branch", "--show-current"])
         .current_dir(working_directory)
         .output()
