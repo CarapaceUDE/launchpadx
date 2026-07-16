@@ -6,6 +6,7 @@ import {
     buildUsageViews,
     creditsSummary,
     formatPlanType,
+    formatRateLimitReachedType,
     isRateLimitReached,
     toneClass,
 } from "../../lib/rateLimits";
@@ -24,6 +25,10 @@ export function LaunchPadXRateLimitsPanel({
     const reached = isRateLimitReached(status);
     const credits = creditsSummary(status?.rateLimits);
     const plan = formatPlanType(status?.planType ?? status?.rateLimits?.planType);
+    const reachedLabel = formatRateLimitReachedType(
+        status?.rateLimits?.rateLimitReachedType,
+        status?.rateLimits,
+    );
 
     return (
         <div className="space-y-3" data-testid="codex-rate-limits-panel">
@@ -54,10 +59,7 @@ export function LaunchPadXRateLimitsPanel({
             {reached ? (
                 <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
                     {TARGET_APP_NAME} reports a usage limit reached
-                    {status?.rateLimits?.rateLimitReachedType
-                        ? ` (${status.rateLimits.rateLimitReachedType})`
-                        : ""}
-                    .
+                    {reachedLabel ? ` (${reachedLabel})` : ""}.
                 </p>
             ) : null}
 
@@ -155,7 +157,7 @@ export function LaunchPadXRateLimitsCompact({
                     className={toneClass(view.tone)}
                     title={view.resetLabel ? `Resets ${view.resetLabel}` : undefined}
                 >
-                    {view.key === "primary" ? "5h" : "weekly"} {view.remainingPercent}% left
+                    {view.shortLabel} {view.remainingPercent}% left
                     {view.resetDateTime ? (
                         <span className="text-muted-foreground"> · resets {view.resetDateTime}</span>
                     ) : null}

@@ -1,6 +1,7 @@
 import { AlertTriangle, Copy, X } from "lucide-react";
 import type { FailoverAlert, SessionCheckpoint } from "../../types";
 import { TARGET_APP_NAME } from "../../lib/branding";
+import { formatRateLimitReachedType } from "../../lib/rateLimits";
 
 export function FailoverBanner({
   alert,
@@ -17,6 +18,11 @@ export function FailoverBanner({
   onDismiss: () => void;
   onCopyResume: () => void;
 }) {
+  const reachedLabel =
+    alert.source === "app_server_rate_limits"
+      ? formatRateLimitReachedType(alert.matchedPattern) ?? alert.matchedPattern
+      : alert.matchedPattern;
+
   return (
     <div
       className="mb-4 rounded-lg border border-warning-fg/30 bg-warning-bg/15 px-4 py-3"
@@ -32,7 +38,7 @@ export function FailoverBanner({
             </p>
             <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
               {alert.source === "app_server_rate_limits"
-                ? `App-server reports ${alert.matchedPattern} via account/rateLimits/read. Switch to your local provider, restart ${TARGET_APP_NAME}, and resume with the saved context.`
+                ? `App-server reports ${reachedLabel} via account/rateLimits/read. Switch to your local provider, restart ${TARGET_APP_NAME}, and resume with the saved context.`
                 : `Matched "${alert.matchedPattern}". Switch to your configured local profile, restart ${TARGET_APP_NAME}, and resume with the saved context.`}
             </p>
             {alert.snippet ? (

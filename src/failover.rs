@@ -245,16 +245,14 @@ mod tests {
             plan_type: Some("plus".to_string()),
             rate_limits: Some(lpad_app_server::CodexRateLimits {
                 limit_id: Some("codex".to_string()),
-                limit_name: None,
                 primary: Some(lpad_app_server::RateLimitWindow {
-                    used_percent: Some(100),
+                    used_percent: Some(100.0),
                     window_duration_mins: Some(300),
                     resets_at: Some(1),
                 }),
-                secondary: None,
-                credits: None,
                 plan_type: Some("plus".to_string()),
-                rate_limit_reached_type: Some("primary".to_string()),
+                rate_limit_reached_type: Some("rate_limit_reached".to_string()),
+                ..Default::default()
             }),
             rate_limit_reset_credits: None,
         };
@@ -262,14 +260,14 @@ mod tests {
         assert!(should_failover_for_rate_limits(&limited));
         assert_eq!(
             rate_limit_reached_from_status(&limited).as_deref(),
-            Some("primary")
+            Some("rate_limit_reached")
         );
 
         let exhausted_without_signal = CodexRateLimitsStatus {
             rate_limits: Some(lpad_app_server::CodexRateLimits {
                 rate_limit_reached_type: None,
                 primary: Some(lpad_app_server::RateLimitWindow {
-                    used_percent: Some(100),
+                    used_percent: Some(100.0),
                     window_duration_mins: Some(300),
                     resets_at: Some(1),
                 }),

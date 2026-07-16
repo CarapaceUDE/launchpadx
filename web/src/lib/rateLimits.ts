@@ -1,10 +1,19 @@
 import type { CodexRateLimits, CodexRateLimitsStatus, RateLimitWindow } from "../types";
 
 export type UsageTone = "ok" | "warn" | "danger" | "muted";
+export type UsageWindowSlot = "primary" | "secondary";
+
+export interface UsageWindowEntry {
+    slot: UsageWindowSlot;
+    window: RateLimitWindow;
+}
 
 export interface WindowUsageView {
-    key: "primary" | "secondary";
+    key: string;
+    slot: UsageWindowSlot;
     label: string;
+    shortLabel: string;
+    windowDurationMins: number | null;
     usedPercent: number | null;
     remainingPercent: number | null;
     resetsAt: number | null;
@@ -14,8 +23,118 @@ export interface WindowUsageView {
     available: boolean;
 }
 
-const PRIMARY_LABEL = "5-hour";
-const SECONDARY_LABEL = "Weekly";
+export function formatWindowLabel(windowDurationMins?: number | null): string {
+    if (windowDurationMins != null) {
+        if (windowDurationMins <= 360) {
+            const hours = Math.max(1, Math.round(windowDurationMins / 60));
+            return hours === 1 ? "1-hour" : `${hours}-hour`;
+        }
+        if (windowDurationMins === 10_080) return "Weekly";
+        if (windowDurationMins === 43_200) return "Monthly";
+        if (windowDurationMins % 10_080 === 0) {
+            const weeks = windowDurationMins / 10_080;
+            return weeks === 1 ? "Weekly" : `${weeks}-week`;
+        }
+        if (windowDurationMins % 1_440 === 0) {
+            const days = windowDurationMins / 1_440;
+            return days === 1 ? "Daily" : `${days}-day`;
+        }
+        return `${windowDurationMins}m window`;
+    }
+
+    return "Usage window";
+}
+
+export function formatWindowShortLabel(windowDurationMins?: number | null): string {
+    if (windowDurationMins != null) {
+        if (windowDurationMins <= 360) {
+            const hours = Math.max(1, Math.round(windowDurationMins / 60));
+            return `${hours}h`;
+        }
+        if (windowDurationMins === 10_080) return "weekly";
+        if (windowDurationMins === 43_200) return "monthly";
+        if (windowDurationMins % 10_080 === 0) {
+            const weeks = windowDurationMins / 10_080;
+            return weeks === 1 ? "weekly" : `${weeks}w`;
+        }
+        if (windowDurationMins % 1_440 === 0) {
+            const days = windowDurationMins / 1_440;
+            return days === 1 ? "daily" : `${days}d`;
+        }
+        return `${windowDurationMins}m`;
+    }
+
+    return "usage";
+}
+
+export function usageWindowKey(window: RateLimitWindow, slot: UsageWindowSlot, index: number): string {
+    if (window.windowDurationMins != null) {
+        return `w-${window.windowDurationMins}`;
+    }
+    return `w-${slot}-${index}`;
+}
+
+/** Gather every populated bucket, dedupe by duration, shortest window first. */
+export function collectUsageWindows(limits?: CodexRateLimits | null): UsageWindowEntry[] {
+    if (!limits) return [];
+
+    const candidates: UsageWindowEntry[] = [];
+    if (limits.primary?.usedPercent != null) {
+        candidates.push({ slot: "primary", window: limits.primary });
+    }
+    if (limits.secondary?.usedPercent != null) {
+        candidates.push({ slot: "secondary", window: limits.secondary });
+    }
+
+    const byDuration = new Map<number, UsageWindowEntry>();
+    const withoutDuration: UsageWindowEntry[] = [];
+
+    for (const entry of candidates) {
+        const mins = entry.window.windowDurationMins;
+        if (mins == null) {
+            withoutDuration.push(entry);
+            continue;
+        }
+        if (!byDuration.has(mins)) {
+            byDuration.set(mins, entry);
+        }
+    }
+
+    const sorted = [...byDuration.values()].sort(
+        (a, b) => (a.window.windowDurationMins ?? 0) - (b.window.windowDurationMins ?? 0),
+    );
+
+    return [...sorted, ...withoutDuration];
+}
+
+export function formatRateLimitReachedType(
+    type?: string | null,
+    limits?: CodexRateLimits | null,
+): string | null {
+    if (!type) return null;
+
+    if (type === "primary" || type === "secondary") {
+        const slotted = type === "primary" ? limits?.primary : limits?.secondary;
+        if (slotted?.windowDurationMins != null) {
+            return `${formatWindowLabel(slotted.windowDurationMins)} window`;
+        }
+
+        const windows = collectUsageWindows(limits);
+        if (windows.length === 1 && windows[0].window.windowDurationMins != null) {
+            return `${formatWindowLabel(windows[0].window.windowDurationMins)} window`;
+        }
+    }
+
+    const labels: Record<string, string> = {
+        rate_limit_reached: "usage limit",
+        workspace_owner_credits_depleted: "workspace credits depleted",
+        workspace_member_credits_depleted: "member credits depleted",
+        workspace_owner_usage_limit_reached: "workspace usage limit",
+        workspace_member_usage_limit_reached: "member usage limit",
+    };
+
+    return labels[type] ?? type.replace(/_/g, " ");
+}
 
 export function remainingPercent(window?: RateLimitWindow | null): number | null {
     if (window?.usedPercent == null) return null;
@@ -74,34 +193,30 @@ export function formatResetTime(resetsAt?: number | null, now = Date.now()): str
     }).format(new Date(resetMs));
 }
 
-export function windowUsageView(
-    key: "primary" | "secondary",
-    label: string,
-    window?: RateLimitWindow | null,
-): WindowUsageView {
-    const usedPercent = window?.usedPercent ?? null;
+export function windowUsageView(entry: UsageWindowEntry, index: number): WindowUsageView {
+    const { slot, window } = entry;
+    const usedPercent = window.usedPercent ?? null;
     const remaining = remainingPercent(window);
+    const windowDurationMins = window.windowDurationMins ?? null;
+
     return {
-        key,
-        label,
+        key: usageWindowKey(window, slot, index),
+        slot,
+        label: formatWindowLabel(windowDurationMins),
+        shortLabel: formatWindowShortLabel(windowDurationMins),
+        windowDurationMins,
         usedPercent,
         remainingPercent: remaining,
-        resetsAt: window?.resetsAt ?? null,
-        resetLabel: formatResetTime(window?.resetsAt),
-        resetDateTime: formatResetDateTime(window?.resetsAt),
+        resetsAt: window.resetsAt ?? null,
+        resetLabel: formatResetTime(window.resetsAt),
+        resetDateTime: formatResetDateTime(window.resetsAt),
         tone: usageTone(remaining),
         available: usedPercent != null,
     };
 }
 
 export function buildUsageViews(status?: CodexRateLimitsStatus | null): WindowUsageView[] {
-    const limits = status?.rateLimits;
-    if (!limits) return [];
-
-    return [
-        windowUsageView("primary", PRIMARY_LABEL, limits.primary),
-        windowUsageView("secondary", SECONDARY_LABEL, limits.secondary),
-    ].filter((view) => view.available);
+    return collectUsageWindows(status?.rateLimits).map((entry, index) => windowUsageView(entry, index));
 }
 
 export function compactUsageLine(status?: CodexRateLimitsStatus | null): string | null {
@@ -115,9 +230,8 @@ export function compactUsageLine(status?: CodexRateLimitsStatus | null): string 
     return views
         .map((view) => {
             const remaining = view.remainingPercent ?? 0;
-            const shortLabel = view.key === "primary" ? "5h" : "weekly";
             const resetSuffix = view.resetDateTime ? ` · resets ${view.resetDateTime}` : "";
-            return `${shortLabel} ${remaining}% left${resetSuffix}`;
+            return `${view.shortLabel} ${remaining}% left${resetSuffix}`;
         })
         .join(" · ");
 }
