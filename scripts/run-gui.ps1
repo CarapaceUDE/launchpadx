@@ -12,4 +12,5 @@ if (-not (Test-Path -LiteralPath $binary)) {
     }
 }
 
-& $binary --gui @args
+# Bare launch opens the GUI by default; no --gui flag required.
+& $binary @args

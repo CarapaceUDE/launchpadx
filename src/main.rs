@@ -1,3 +1,6 @@
+// Windows GUI product binary: no console window. Release packaging also builds
+// a console CLI (`--no-default-features` → launchpadx-cli.exe). Without this,
+// bare/double-click launch opens a CLI window next to the GUI.
 #![cfg_attr(
     all(target_os = "windows", feature = "desktop"),
     windows_subsystem = "windows"
@@ -12,8 +15,30 @@ fn main() {
     }
 }
 
+/// Detach from any console so the desktop window is not paired with a CLI shell.
+/// Safe no-op when the PE is already `WINDOWS` subsystem and has no console.
+#[cfg(windows)]
+fn detach_console_for_gui() {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn FreeConsole() -> i32;
+    }
+    // SAFETY: FreeConsole is valid to call with or without an attached console.
+    unsafe {
+        let _ = FreeConsole();
+    }
+}
+
+#[cfg(not(windows))]
+fn detach_console_for_gui() {}
+
 fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+
+    if std::env::args_os().any(|a| a == "--help" || a == "-h") {
+        print_help();
+        return Ok(());
+    }
 
     if args.serve_only {
         let root = launchpadx::web_backend::resolve_gui_root();
@@ -24,25 +49,22 @@ fn dispatch() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    if args.gui {
+    // Desktop GUI is the default product surface. CLI actions require an
+    // explicit flag; `--gui` remains accepted as a no-op compatibility alias.
+    if args.gui || !args.has_cli_action() {
+        if !args.unknown_args.is_empty() {
+            return Err(format!(
+                "unrecognized argument(s): {}; pass --help to see available commands",
+                args.unknown_args.join(", ")
+            )
+            .into());
+        }
+
+        detach_console_for_gui();
         let root = launchpadx::web_backend::resolve_gui_root();
         let config_path = args
             .config_path
             .unwrap_or_else(|| default_gui_config_path(&root));
-        launchpadx::web_backend::launch_web_gui(root, config_path)?;
-        return Ok(());
-    }
-
-    if std::env::args_os().any(|a| a == "--help" || a == "-h") {
-        print_help();
-        return Ok(());
-    }
-
-    // A desktop release is normally started by double-clicking the executable.
-    // Keep CLI actions explicit, but make the no-argument path open the GUI.
-    if !args.has_explicit_action() {
-        let root = launchpadx::web_backend::resolve_gui_root();
-        let config_path = default_gui_config_path(&root);
         launchpadx::web_backend::launch_web_gui(root, config_path)?;
         return Ok(());
     }
@@ -252,33 +274,41 @@ fn print_help() {
     println!("{}", launchpadx::branding::APP_NAME);
     println!();
     println!("USAGE:");
-    println!("    launchpadx [OPTIONS]");
+    println!("    launchpadx                      Open the desktop GUI (default)");
+    println!("    launchpadx [CLI OPTIONS]        Run a headless/automation command");
     println!();
-    println!("OPTIONS:");
-    println!("         --gui                      Open the GUI");
+    println!("DEFAULT:");
+    println!("    With no CLI flags, launchpadx opens the desktop GUI.");
+    println!("    Double-click / bare launch always starts the GUI.");
+    println!();
+    println!("GUI OPTIONS:");
+    println!("         --gui                      Explicitly open the GUI (optional; default)");
     println!("         --serve-only               Serve web UI over HTTP (no native window)");
     println!("         --port <port>              Port for --serve-only (default: random)");
-    println!("         --config <path>           Path to config.json (default: auto-detect)");
-    println!("         --write-config-only       Write Codex config but do not launch");
-    println!("         --restore                 Restore previous Codex settings");
-    println!("         --refresh-models          Refresh the Ollama model cache");
-    println!("         --list-models             List cached or fetched Ollama models");
-    println!("         --launch                  Launch Codex");
-    println!("         --launch-wait             Launch Codex and wait for API readiness");
-    println!("         --kill                    Kill the running Codex process");
-    println!("         --health                  Check if Codex API is ready");
-    println!("         --diagnose                Run setup and connectivity checks");
-    println!("         --build-check             Rebuild stale Rust/web artifacts and stage release output");
-    println!("         --session-create          Create a new ACP session");
-    println!("         --session-send <id> <msg> Send a message to a session");
-    println!("         --session-response <id>   Read response from a session");
-    println!("         --session-close <id>      Close a session");
-    println!("         --session-list            List active sessions");
-    println!("         -h, --help                Show this help message");
+    println!("         --config <path>            Path to config.json (default: auto-detect)");
+    println!();
+    println!("CLI OPTIONS (headless / automation — each is required for that action):");
+    println!("         --write-config-only        Write Codex config but do not launch");
+    println!("         --restore                  Restore previous Codex settings");
+    println!("         --refresh-models           Refresh the Ollama model cache");
+    println!("         --list-models              List cached or fetched Ollama models");
+    println!("         --launch                   Launch Codex");
+    println!("         --launch-wait              Launch Codex and wait for API readiness");
+    println!("         --kill                     Kill the running Codex process");
+    println!("         --health                   Check if Codex API is ready");
+    println!("         --diagnose                 Run setup and connectivity checks");
+    println!("         --build-check              Rebuild stale Rust/web artifacts and stage release output");
+    println!("         --session-create           Create a new ACP session");
+    println!("         --session-send <id> <msg>  Send a message to a session");
+    println!("         --session-response <id>    Read response from a session");
+    println!("         --session-close <id>       Close a session");
+    println!("         --session-list             List active sessions");
+    println!("         -h, --help                 Show this help message");
     println!();
     println!("CONFIG:");
     println!("    Local settings live in config.json, which is gitignored.");
     println!("    Public defaults live in config.example.json.");
+    println!("    The GUI can create/save config.json from the settings UI.");
 }
 
 fn print_models(cache: &launchpadx::ollama::ModelCache) {
@@ -417,10 +447,13 @@ impl Args {
             || self.session_list
     }
 
-    fn has_explicit_action(&self) -> bool {
-        !self.unknown_args.is_empty()
-            || self.config_path.is_some()
-            || self.write_config_only
+    /// True when the user requested a headless/automation action.
+    ///
+    /// `--config` alone is not a CLI action: it only selects the config path
+    /// for the default GUI (or for a CLI action when one is also present).
+    /// `--gui` / `--serve-only` are handled separately before this check.
+    fn has_cli_action(&self) -> bool {
+        self.write_config_only
             || self.restore
             || self.refresh_models
             || self.list_models
@@ -464,6 +497,27 @@ mod tests {
         assert!(args.session_close.is_none());
         assert!(!args.session_list);
         assert!(!args.needs_async());
+        assert!(!args.has_cli_action());
+    }
+
+    #[test]
+    fn config_path_alone_is_not_a_cli_action() {
+        let args = Args {
+            config_path: Some(PathBuf::from("config.json")),
+            ..Args::default()
+        };
+        assert!(!args.has_cli_action());
+        assert!(!args.needs_async());
+    }
+
+    #[test]
+    fn launch_flag_is_a_cli_action() {
+        let args = Args {
+            launch: true,
+            ..Args::default()
+        };
+        assert!(args.has_cli_action());
+        assert!(!args.needs_async());
     }
 
     #[test]
@@ -473,5 +527,6 @@ mod tests {
             ..Args::default()
         };
         assert!(args.needs_async());
+        assert!(args.has_cli_action());
     }
 }

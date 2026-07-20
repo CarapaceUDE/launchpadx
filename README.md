@@ -45,7 +45,7 @@ Meet other LaunchPadX users, share compatible endpoints and setups, ask question
 - **Dual provider modes** — Codex cloud account or route through any OpenAI-compatible API (vLLM, LiteLLM, OpenRouter, your own gateway, etc.)
 - **Model discovery** — fetch and cache models from your endpoint's API
 - **Codex config sync** — writes and restores `~/.codex/config.toml` safely
-- **Desktop GUI + CLI** — full UI or scriptable headless workflows
+- **Desktop GUI + CLI** — GUI is the default (`launchpadx`); CLI actions use explicit flags
 - **Cross-platform** — Windows, macOS, and Linux builds
 - **Dark / light theme**
 
@@ -78,7 +78,7 @@ Release binaries are built from the tagged commit by GitHub Actions on Windows, 
 
 - **macOS:** the universal archive supports Apple Silicon and Intel. Builds are ad-hoc signed but not yet Apple-notarized, so on first launch Control-click `LaunchPadX.app`, choose **Open**, then confirm **Open**. Routine double-click launch works afterward.
 - **Linux:** the archive targets x86_64 distributions with GTK 3 and WebKitGTK 4.1. On Ubuntu/Debian, install runtime libraries with `sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libayatana-appindicator3-1 librsvg2-2` if they are not already present.
-- **Windows CLI:** use `launchpadx-cli.exe` for command-line operations. `launchpadx.exe` is the desktop build and intentionally has no console window.
+- **Windows CLI:** use `launchpadx-cli.exe` (console-attached) for headless commands. `launchpadx.exe` is the desktop build (no console window); bare launch opens the GUI. Local builds default to the GUI PE via the `desktop` feature — build a console binary with `cargo build --release --no-default-features`.
 - **Windows trust warning:** builds remain unsigned until a trusted Authenticode certificate is configured. A self-signed certificate does not remove SmartScreen warnings for public users.
 
 ---
@@ -104,22 +104,22 @@ The project targets **Windows, macOS, and Linux**. You can build on any of them 
 
 Build and run locally on any supported OS:
 
-1. **Copy and edit the config:**
-   ```sh
-   cp config.example.json config.json
-   # Edit config.json with your API host, port, and key
-   ```
-
-2. **Build and launch the GUI:**
+1. **Build and launch the GUI:**
    ```sh
    cd web && npm ci && npm run build && cd ..
    cargo build --release
-   ./target/release/launchpadx --gui
+   ./target/release/launchpadx
    ```
+
+   Bare launch opens the desktop GUI. No `--gui` flag is required (`--gui` is still accepted as a compatibility alias).
 
    On Windows the binary is `target\release\launchpadx.exe`. If `web/dist/` is missing, `cargo build` runs `npm ci` (when `web/node_modules` is absent) and then `npm run build` via `build.rs`. You can still run `cd web && npm ci` yourself first — that is the most reliable path on a fresh clone.
 
    **Windows shortcut:** `.\run-gui.cmd` runs a stale-build check and launches the release GUI — convenience only, not required.
+
+2. **Configure in the UI (or copy a template):**
+   - Prefer the Settings tab — first save creates `config.json` next to the binary / project root.
+   - Or start from the template: `cp config.example.json config.json` and edit host/port/key.
 
 3. **Use the UI:**
    - **Launch tab** — select a model, launch Codex.
@@ -130,7 +130,7 @@ Build and run locally on any supported OS:
 
 ## CLI Usage (headless / automation)
 
-You can also operate the launchpad entirely from the command line on any platform.
+Headless and automation flows use the **same binary**, but each action requires an **explicit flag**. Running `launchpadx` with no CLI flags always opens the GUI.
 
 ### Building & Running
 
@@ -139,15 +139,16 @@ You can also operate the launchpad entirely from the command line on any platfor
 cd web && npm ci && npm run build && cd ..
 cargo build --release
 
-# Run the CLI (same binary as the GUI)
-./target/release/launchpadx --config config.json
+# Headless example (flag required)
+./target/release/launchpadx --list-models --config config.json
 ```
 
-The binary lives at `target/debug/launchpadx` (debug) or `target/release/launchpadx` (release). Add `.exe` on Windows.
+The binary lives at `target/debug/launchpadx` (debug) or `target/release/launchpadx` (release). Add `.exe` on Windows. On Windows release archives, prefer `launchpadx-cli.exe` when you need console output.
 
 ### Common CLI commands
 
 ```sh
+launchpadx                           # open the desktop GUI (default)
 launchpadx --refresh-models          # discover and cache models
 launchpadx --list-models             # print cached models
 launchpadx --write-config-only       # write ~/.codex/config.toml only
@@ -157,7 +158,7 @@ launchpadx --diagnose                # setup and connectivity checks
 launchpadx --help                    # full flag list
 ```
 
-Pass `--config path/to/config.json` when not running from the repo root.
+Pass `--config path/to/config.json` when not running from the repo root. With no CLI action flag, `--config` only selects the path for the GUI.
 
 ### Windows helper scripts (optional)
 
@@ -233,7 +234,7 @@ Cross-platform logic lives in the Rust binary and `build.rs`. These wrappers are
 | `launchpadx --build-check` | All platforms | Incremental rebuild + staging |
 | `build-check.sh` / `build-check.ps1` | All (thin wrappers) | Run `--build-check` |
 | `build.cmd` / `scripts/build.ps1` | Windows | `cargo build --bins` |
-| `run-gui.cmd` | Windows | Build if stale, then `launchpadx --gui` |
+| `run-gui.cmd` | Windows | Build if stale, then bare `launchpadx` (GUI default) |
 | `test.cmd` | Windows | `cargo fmt --check`, `cargo test`, `cargo clippy` |
 | `diagnose.sh` / `diagnose.ps1` | All (thin wrappers) | Run `launchpadx --diagnose` |
 
@@ -280,7 +281,7 @@ This project is an independent tool and is not affiliated with, endorsed by, or 
 
 ```
 ├── src/                  # Rust source (GUI + CLI binary)
-│   ├── main.rs           # CLI entry point
+│   ├── main.rs           # Entry point (default GUI; CLI flags for headless)
 │   └── web_backend.rs    # HTTP server + UI serving
 ├── web/                  # Vite + React + Tailwind web UI
 │   ├── src/              # React components & pages

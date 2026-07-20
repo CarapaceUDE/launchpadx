@@ -3,15 +3,16 @@
 ## Project Overview
 
 Rust GUI/CLI application with a React + Vite web UI. The Rust code provides:
-- **GUI mode** (`launchpadx --gui`) — runs a Tauri-like webview app using `wry`/`tao`
-- **CLI mode** (`launchpadx`) — headless: discover models, apply Codex config, refresh model cache
+- **GUI mode** (`launchpadx`, default) — desktop webview app via `wry`/`tao`; no flag required
+- **CLI mode** (`launchpadx --launch`, `--list-models`, `--diagnose`, etc.) — headless actions require an explicit flag
 - **Embedded HTTP server** (`web_backend.rs`) — serves the web UI and exposes RPC endpoints
 
 The web UI is a standalone Vite + React + Tailwind app that gets bundled and embedded into the Rust binary.
 
 ## Build System
 
-- **Rust**: `cargo build --release --bin launchpadx`
+- **Rust**: `cargo build --release --bin launchpadx` (includes `desktop` by default — Windows GUI PE, no console)
+- **Windows console CLI**: `cargo build --release --bin launchpadx --no-default-features` (release stages this as `launchpadx-cli.exe`)
 - **Web UI**: `cd web && npm run build` (Vite → `web/dist/`)
 - **Build script**: `build.rs` auto-runs `npm ci` + `npm run build` if needed (all OSes)
 - **Build checker**: `launchpadx --build-check` (or `build-check.sh` / `build-check.ps1` wrappers)
@@ -83,7 +84,7 @@ Located in `web/`. Built with Vite + React + TypeScript + Tailwind CSS.
 
 | File | Purpose |
 |---|---|
-| `src/main.rs` | CLI entry point, argument parsing |
+| `src/main.rs` | Entry point: default GUI, CLI flags for headless actions |
 | `src/web_backend.rs` | HTTP server, UI serving, model cache |
 | `web/src/App.tsx` | Main React app component |
 | `web/src/main.tsx` | React entry point |

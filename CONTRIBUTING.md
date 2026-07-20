@@ -27,8 +27,8 @@ Or use `./build.sh` on macOS/Linux/Git Bash. `cargo build` alone also works — 
 
 | Command | Purpose |
 |---|---|
-| `launchpadx --gui` | Launch the desktop UI |
-| `launchpadx --launch` | Write config and launch Codex |
+| `launchpadx` | Launch the desktop UI (default; no flag required) |
+| `launchpadx --launch` | Headless: write config and launch Codex |
 | `cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings` | Pre-commit checks |
 | `cd web && npm run screenshot:readme` | Regenerate `assets/readme-screenshot.png` for the README |
 
@@ -36,13 +36,17 @@ On Windows you can use `.\run-gui.cmd`, `.\test.cmd`, and the scripts in `script
 
 ### CLI Options
 
+Headless/automation commands require an explicit flag. Bare `launchpadx` always opens the GUI.
+
 ```
-launchpadx --config <path>
+launchpadx                        # desktop GUI (default)
+launchpadx --config <path>        # GUI with an explicit config path
 launchpadx --write-config-only
 launchpadx --refresh-models
 launchpadx --list-models
 launchpadx --restore
 launchpadx --diagnose
+launchpadx --launch
 ```
 
 ## How to Contribute
@@ -65,13 +69,13 @@ launchpadx --diagnose
 
 ```
 src/
-  main.rs          # CLI entry point
+  main.rs          # Entry point (default GUI; CLI flags for headless)
   lib.rs           # Library root (re-exports modules)
   config.rs        # Local JSON config reader/validator
-  codex_config.rs  # ~/.codex/config.toml management
-  ollama.rs        # Ollama model discovery + caching
+  lpad_config.rs   # ~/.codex/config.toml management
+  ollama.rs        # Model discovery + caching
   app_logic.rs     # Shared business logic (write/restore/refresh/launch)
-  gui.rs           # egui/eframe desktop UI
+  web_backend.rs   # Desktop webview + embedded HTTP/RPC
   launcher/        # Platform-specific launch code
     mod.rs         # Unified resolve + launch dispatcher
     windows.rs     # Windows: PATH search + Store AppID

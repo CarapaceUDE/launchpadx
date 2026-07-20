@@ -149,9 +149,11 @@ jobs:
           BINARY_NAME: ${{ inputs['binary-name'] || 'launchpadx' }}
           TARGET: ${{ matrix.target }}
         run: |
-          cargo build --locked --release --bin "$BINARY_NAME" --target "$TARGET"
+          # Console CLI first (no desktop feature / windows_subsystem).
+          cargo build --locked --release --bin "$BINARY_NAME" --target "$TARGET" --no-default-features
           cp "target/$TARGET/release/$BINARY_NAME.exe" "target/$TARGET/release/$BINARY_NAME-cli.exe"
-          cargo build --locked --release --bin "$BINARY_NAME" --target "$TARGET" --features desktop
+          # GUI binary last: default features include `desktop` (no console window).
+          cargo build --locked --release --bin "$BINARY_NAME" --target "$TARGET"
         shell: bash
 
       - name: Build universal macOS binary

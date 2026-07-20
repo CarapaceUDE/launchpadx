@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] — 2026-07-19
+
+### Fixed
+- Windows GUI builds no longer open a console window next to the app: `desktop` is a default Cargo feature so local builds match release PE packaging.
+- Windows GUI launch detaches any inherited console via `FreeConsole`.
+- Start/Stop no longer flashes "Stop Codex" when Codex is not open — health checks ignore short-lived `codex app-server` rate-limit probes.
+
+### Changed
+- Bare `launchpadx` opens the desktop GUI by default; headless/automation requires an explicit CLI flag.
+- `--gui` remains an optional compatibility alias; launch scripts no longer require it.
+- `--config <path>` alone selects the config for the GUI instead of falling through to help.
+- Release workflow builds the console CLI with `--no-default-features` and the GUI binary with default features.
+
 ## [0.2.5] — 2026-07-12
 
 ### Fixed

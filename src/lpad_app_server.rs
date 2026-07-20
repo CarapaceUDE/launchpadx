@@ -173,6 +173,7 @@ pub fn read_rate_limits(config: &LauncherConfig) -> CodexRateLimitsStatus {
 
 struct AppServerClient {
     child: Child,
+    child_pid: u32,
     stdin: ChildStdin,
     reader: BufReader<ChildStdout>,
     next_id: i64,
@@ -194,6 +195,11 @@ impl AppServerClient {
                 }
             })?;
 
+        // Background rate-limit / thread probes spawn a short-lived `codex app-server`.
+        // Register the PID so health checks do not treat the probe as "Codex is running".
+        let child_pid = child.id();
+        crate::process_util::register_transient_helper_pid(child_pid);
+
         let stdin = child
             .stdin
             .take()
@@ -205,6 +211,7 @@ impl AppServerClient {
 
         Ok(Self {
             child,
+            child_pid,
             stdin,
             reader: BufReader::new(stdout),
             next_id: 1,
@@ -270,6 +277,7 @@ impl Drop for AppServerClient {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        crate::process_util::unregister_transient_helper_pid(self.child_pid);
     }
 }
 

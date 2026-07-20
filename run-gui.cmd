@@ -19,7 +19,8 @@ if not exist "%ROOT%target\release\launchpadx.exe" (
 )
 
 :: Keep the console attached so runtime errors remain visible.
-"%ROOT%target\release\launchpadx.exe" --gui
+:: Bare launch opens the GUI by default; no --gui flag required.
+"%ROOT%target\release\launchpadx.exe"
 if errorlevel 1 (
     echo Error: GUI exited unexpectedly. Check the output above.
     pause

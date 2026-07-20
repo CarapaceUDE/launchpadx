@@ -1,10 +1,12 @@
 # Architecture
 
-`launchpadx` has two layers:
+`launchpadx` is a desktop-first launcher with optional headless CLI flags:
 
+- **Default:** bare `launchpadx` (or double-click) opens the desktop GUI via `web_backend.rs` (`wry`/`tao` + embedded HTTP/RPC).
+- **CLI:** headless actions require explicit flags (`--launch`, `--list-models`, `--diagnose`, …).
 - `src/config.rs` reads the local JSON config and normalizes the OpenAI-compatible endpoint.
-- `src/codex_config.rs` updates `~/.codex/config.toml` for persistent provider settings and creates backups before writing.
-- `src/ollama.rs` discovers models from Ollama's `GET /api/tags` endpoint and stores a cache for future UI selection.
+- `src/lpad_config.rs` updates `~/.codex/config.toml` for persistent provider settings and creates backups before writing.
+- `src/ollama.rs` discovers models from the OpenAI-compatible models API and stores a cache for UI selection.
 - `src/launcher/` resolves and starts Codex using the best platform-specific launch target.
 
 Launch targets:
