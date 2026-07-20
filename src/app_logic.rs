@@ -564,6 +564,8 @@ fn is_launcher_process_name(name: &str) -> bool {
     lower.contains("launchpadx")
 }
 
+// Only referenced from Windows process-name detection / stop paths.
+#[cfg(windows)]
 fn is_known_codex_image_name(name: &str) -> bool {
     let base = name
         .rsplit(['/', '\\'])
